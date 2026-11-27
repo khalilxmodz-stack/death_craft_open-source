@@ -20,12 +20,14 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <cstring>
+#include <fstream>
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR,"DeathCraft",__VA_ARGS__)
 static constexpr int CS=16, HEIGHT=32, LOAD_RADIUS=4;
 static constexpr float PI=3.14159265f;
+static constexpr int SEA_LEVEL=6;
 
 struct V3 { float x,y,z; };
 struct Mat4 { float m[16]{}; };
@@ -95,6 +97,10 @@ class Game {
     int selected=0,breakPointer=-1,breakX=0,breakY=0,breakZ=0,dragIndex=-1,dragPointer=-1;
     float breakTimer=0;
     int health=10,armor=10,grafikHealth=2;
+    bool creativeMode=true,flatWorld=false,inWorld=false;
+    int selectedSlot=0;
+    std::string saveDirectory;
+    float saveTimer=0;
     float grafikX=5.0f,grafikZ=-5.0f,grafikFeet=0,grafikRespawn=0,swallowTimer=0;
     bool grafikAlive=true,playerDead=false;
     struct Item{uint8_t id=0;int count=0;};std::array<Item,20> inventory{};
@@ -197,6 +203,49 @@ class Game {
         glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_S,GL_CLAMP_TO_EDGE);glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_T,GL_CLAMP_TO_EDGE);glGenerateMipmap(GL_TEXTURE_2D);
         LOGE("Loaded block textures: %d/3",loaded);return loaded>0;
     }
+    int groundHeight(int x,int z)const{return flatWorld?8:terrainHeight(x,z);}
+    std::string savePath()const{return saveDirectory+"/deathcraft_world_"+std::to_string(selectedSlot)+".dat";}
+    void saveWorld(){
+        if(!inWorld||saveDirectory.empty())return;
+        std::ofstream out(savePath(),std::ios::binary|std::ios::trunc);if(!out)return;
+        const char magic[8]={'D','C','W','O','R','L','D','1'};out.write(magic,8);
+        int32_t version=1,mode=creativeMode?1:0,flat=flatWorld,slot=selectedSlot,hp=health,ap=armor,sel=selected;uint32_t count=(uint32_t)edits.size();
+        out.write((char*)&version,4);out.write((char*)&mode,4);out.write((char*)&flat,4);out.write((char*)&slot,4);
+        out.write((char*)&px,sizeof(px));out.write((char*)&feet,sizeof(feet));out.write((char*)&pz,sizeof(pz));out.write((char*)&yaw,sizeof(yaw));out.write((char*)&pitch,sizeof(pitch));
+        out.write((char*)&hp,4);out.write((char*)&ap,4);out.write((char*)&sel,4);
+        for(const auto&i:inventory){out.write((char*)&i.id,1);int32_t n=i.count;out.write((char*)&n,4);}
+        out.write((char*)&count,4);
+        for(const auto&e:edits){int32_t x=std::get<0>(e.first),y=std::get<1>(e.first),z=std::get<2>(e.first);uint8_t b=e.second;out.write((char*)&x,4);out.write((char*)&y,4);out.write((char*)&z,4);out.write((char*)&b,1);}
+    }
+    bool loadWorld(){
+        std::ifstream in(savePath(),std::ios::binary);if(!in)return false;
+        char magic[8]{};in.read(magic,8);if(!in||std::memcmp(magic,"DCWORLD1",8)!=0)return false;
+        int32_t version=0,mode=1,flat=0,slot=0,hp=10,ap=10,sel=0;uint32_t count=0;
+        in.read((char*)&version,4);in.read((char*)&mode,4);in.read((char*)&flat,4);in.read((char*)&slot,4);
+        if(!in||version!=1)return false;
+        in.read((char*)&px,sizeof(px));in.read((char*)&feet,sizeof(feet));in.read((char*)&pz,sizeof(pz));in.read((char*)&yaw,sizeof(yaw));in.read((char*)&pitch,sizeof(pitch));
+        in.read((char*)&hp,4);in.read((char*)&ap,4);in.read((char*)&sel,4);
+        for(auto&i:inventory){int32_t n=0;in.read((char*)&i.id,1);in.read((char*)&n,4);i.count=std::clamp(n,0,999999);}
+        in.read((char*)&count,4);if(!in||count>2000000)return false;
+        edits.clear();for(uint32_t i=0;i<count;i++){int32_t x,y,z;uint8_t b;in.read((char*)&x,4);in.read((char*)&y,4);in.read((char*)&z,4);in.read((char*)&b,1);if(!in)return false;edits[{x,y,z}]=b;}
+        creativeMode=mode!=0;flatWorld=flat!=0;health=std::clamp(hp,0,10);armor=std::clamp(ap,0,10);selected=std::clamp(sel,0,4);return true;
+    }
+    void startWorld(){
+        chunks.clear();edits.clear();inventory={};health=10;armor=10;grafikHealth=2;grafikAlive=true;playerDead=false;swallowTimer=0;
+        px=0;pz=0;yaw=0;pitch=0;vy=0;feet=(float)groundHeight(0,0);grounded=true;
+        bool loaded=loadWorld();
+        if(!loaded){
+            px=0;pz=0;
+            if(!flatWorld){for(int radius=0;radius<80&&groundHeight((int)px,(int)pz)<=SEA_LEVEL;radius++){px=(float)(radius+1);pz=(float)((radius%2)?radius/2:-radius/2);}}
+            feet=(float)groundHeight((int)px,(int)pz);
+            inventory[0]=creativeMode?Item{1,999999}:Item{1,32};inventory[1]=creativeMode?Item{2,999999}:Item{2,16};
+            inventory[2]=creativeMode?Item{3,999999}:Item{3,12};inventory[3]=creativeMode?Item{4,999999}:Item{4,4};
+            inventory[4]=creativeMode?Item{5,999999}:Item{5,8};inventory[5]=creativeMode?Item{6,999999}:Item{6,8};
+            inventory[6]=creativeMode?Item{7,999999}:Item{7,0};inventory[7]=creativeMode?Item{8,999999}:Item{8,0};
+        }
+        if(creativeMode)for(auto&i:inventory)if(i.id)i.count=999999;
+        grafikX=6;grafikZ=-5;grafikFeet=(float)groundHeight(6,-5);selected=0;inWorld=true;saveTimer=0;updateWorld();status=loaded?"WORLD LOADED":"WORLD CREATED";statusFrames=120;
+    }
     uint8_t blockAt(int x,int y,int z)const{
         int cx=floorDiv(x,CS),cz=floorDiv(z,CS);auto it=chunks.find(chunkKey(cx,cz));
         return it==chunks.end()?0:it->second.get(modp(x,CS),y,modp(z,CS));
@@ -211,25 +260,26 @@ class Game {
                 for(int dy=2;dy<=5;dy++)if(blockAt(gx+dx,gy+dy,gz+dz)==5){underTree=true;break;}
             if(underTree)light*=.52f;
         }
-        V3 color{light,light,light};
+        V3 color=block==9?V3{.22f*light,.52f*light,.88f*light}:V3{light,light,light};
         addTri(v,a,b,c,color,u0,v0,u1,v0,u1,v1);addTri(v,a,c,d,color,u0,v0,u1,v1,u0,v1);
     }
     bool solid(int x,int y,int z){
         int cx=floorDiv(x,CS),cz=floorDiv(z,CS);auto it=chunks.find(chunkKey(cx,cz));
         if(it==chunks.end())return y<0;
-        return it->second.get(modp(x,CS),y,modp(z,CS))!=0;
+        uint8_t b=it->second.get(modp(x,CS),y,modp(z,CS));return b!=0&&b!=9;
     }
     void generate(Chunk&c){
         int ox=c.cx*CS,oz=c.cz*CS;
         for(int z=0;z<CS;z++)for(int x=0;x<CS;x++){
-            int h=terrainHeight(ox+x,oz+z);
+            int h=groundHeight(ox+x,oz+z);
             for(int y=0;y<h;y++)c.set(x,y,z,y==h-1?1:(y>=h-4?2:3));
+            if(h<SEA_LEVEL)for(int y=h;y<SEA_LEVEL;y++)c.set(x,y,z,9);
         }
         auto put=[&](int x,int y,int z,uint8_t id){if(floorDiv(x,CS)==c.cx&&floorDiv(z,CS)==c.cz)c.set(modp(x,CS),y,modp(z,CS),id);};
         for(int z=oz-2;z<oz+CS+2;z++)for(int x=ox-2;x<ox+CS+2;x++){
             if(modp(x+3,8)||modp(z+5,8))continue;
             uint32_t h=terrainHash(x,z);if(h%3==0)continue;
-            int ground=terrainHeight(x,z);if(ground>7)continue;
+            int ground=groundHeight(x,z);if(ground>7||ground<SEA_LEVEL)continue;
             int trunk=3+(int)(h%2);
             for(int y=0;y<trunk;y++)put(x,ground+y,z,4);
             int top=ground+trunk;
@@ -253,7 +303,7 @@ class Game {
         return it->second;
     }
     V3 blockColor(uint8_t b,int face){
-        if(b==1){if(face==2)return{.22f,.68f,.18f};return{.42f,.29f,.16f};}
+        if(b==9)return{.12f,.42f,.82f};if(b==1){if(face==2)return{.22f,.68f,.18f};return{.42f,.29f,.16f};}
         if(b==2)return{.48f,.31f,.17f};if(b==3)return{.43f,.45f,.48f};
         if(b==4)return{.43f,.27f,.12f};if(b==5)return{.12f,.48f,.13f};if(b==6)return{.67f,.46f,.24f};return{.72f,.62f,.35f};
     }
@@ -265,7 +315,7 @@ class Game {
         return true;
     }
     uint8_t selectedBlock()const{return inventory[selected].count?inventory[selected].id:1;}
-    void consumeSelected(){}
+    void consumeSelected(){if(!creativeMode&&inventory[selected].count>0&&--inventory[selected].count==0)inventory[selected].id=0;}
     void craft(int r){uint8_t src=r==0?4:6;int n=r==0?1:(r==1?2:4);for(auto&i:inventory)if(i.id==src&&n){int k=std::min(n,i.count);i.count-=k;n-=k;if(!i.count)i.id=0;}if(n){status=r==0?"Need wood":"Need planks";statusFrames=90;return;}addItem(r==0?6:(r==1?7:8),r==0?4:(r==1?4:1));}
     int inventorySlotAt(float x,float y)const{for(int r=0;r<4;r++)for(int c=0;c<5;c++){float bx=-.58f+c*.235f,by=.30f-r*.245f;if(x>=bx&&x<=bx+.19f&&y>=by-.19f&&y<=by+.02f)return r*5+c;}return -1;}
     void rebuild(Chunk&c){
@@ -275,12 +325,12 @@ class Game {
             float X=(float)(ox+x),Y=(float)y,Z=(float)(oz+z);
             V3 p000{X,Y,Z},p100{X+1,Y,Z},p110{X+1,Y+1,Z},p010{X,Y+1,Z};
             V3 p001{X,Y,Z+1},p101{X+1,Y,Z+1},p111{X+1,Y+1,Z+1},p011{X,Y+1,Z+1};
-            if(!solid(ox+x,y,oz+z-1))addBlockFace(c.mesh,p000,p100,p110,p010,b,0,ox+x,y,oz+z);
-            if(!solid(ox+x,y,oz+z+1))addBlockFace(c.mesh,p101,p001,p011,p111,b,1,ox+x,y,oz+z);
-            if(!solid(ox+x,y+1,oz+z))addBlockFace(c.mesh,p010,p110,p111,p011,b,2,ox+x,y,oz+z);
-            if(!solid(ox+x,y-1,oz+z))addBlockFace(c.mesh,p001,p101,p100,p000,b,3,ox+x,y,oz+z);
-            if(!solid(ox+x-1,y,oz+z))addBlockFace(c.mesh,p001,p000,p010,p011,b,4,ox+x,y,oz+z);
-            if(!solid(ox+x+1,y,oz+z))addBlockFace(c.mesh,p100,p101,p111,p110,b,5,ox+x,y,oz+z);
+            if(!solid(ox+x,y,oz+z-1)&&c.get(x,y,z-1)!=9)addBlockFace(c.mesh,p000,p100,p110,p010,b,0,ox+x,y,oz+z);
+            if(!solid(ox+x,y,oz+z+1)&&c.get(x,y,z+1)!=9)addBlockFace(c.mesh,p101,p001,p011,p111,b,1,ox+x,y,oz+z);
+            if(!solid(ox+x,y+1,oz+z)&&c.get(x,y+1,z)!=9)addBlockFace(c.mesh,p010,p110,p111,p011,b,2,ox+x,y,oz+z);
+            if(!solid(ox+x,y-1,oz+z)&&c.get(x,y-1,z)!=9)addBlockFace(c.mesh,p001,p101,p100,p000,b,3,ox+x,y,oz+z);
+            if(!solid(ox+x-1,y,oz+z)&&c.get(x-1,y,z)!=9)addBlockFace(c.mesh,p001,p000,p010,p011,b,4,ox+x,y,oz+z);
+            if(!solid(ox+x+1,y,oz+z)&&c.get(x+1,y,z)!=9)addBlockFace(c.mesh,p100,p101,p111,p110,b,5,ox+x,y,oz+z);
         }
         c.dirty=false;
     }
@@ -356,7 +406,7 @@ class Game {
         case 'N':return {17,25,25,21,19,19,17};case 'O':return {14,17,17,17,17,17,14};
         case 'P':return {30,17,17,30,16,16,16};case 'R':return {30,17,17,30,20,18,17};
         case 'S':return {15,16,16,14,1,1,30};case 'T':return {31,4,4,4,4,4,4};
-        case 'U':return {17,17,17,17,17,17,14};case 'V':return {17,17,17,17,17,10,4};
+        case 'U':return {17,17,17,17,17,17,14};case 'V':return {17,17,17,17,17,10,4};case 'W':return {17,17,17,21,21,21,10};
         case 'Y':return {17,17,10,4,4,4,4};
         case '0':return {14,17,19,21,25,17,14};case '1':return {4,12,4,4,4,4,14};
         case '2':return {14,17,1,2,4,8,31};case '3':return {30,1,1,14,1,1,30};
@@ -449,12 +499,12 @@ class Game {
         }else{status="GRAFIK OUT OF REACH";statusFrames=70;}
     }
     void updateGrafik(float dt){
-        if(!grafikAlive){grafikRespawn+=dt;if(grafikRespawn>18.0f){grafikAlive=true;grafikHealth=2;grafikX=px+6.0f;grafikZ=pz-5.0f;grafikFeet=(float)terrainHeight((int)std::floor(grafikX),(int)std::floor(grafikZ));}return;}
-        if(playerDead)return;
+        if(!grafikAlive){grafikRespawn+=dt;if(grafikRespawn>18.0f){grafikAlive=true;grafikHealth=2;grafikX=px+6.0f;grafikZ=pz-5.0f;grafikFeet=(float)groundHeight((int)std::floor(grafikX),(int)std::floor(grafikZ));}return;}
+        if(playerDead||creativeMode)return;
         float dx=px-grafikX,dz=pz-grafikZ,dist=std::sqrt(dx*dx+dz*dz);
         if(dist<.82f){playerDead=true;swallowTimer=.001f;return;}
         if(dist>1.0f){float step=std::min(1.65f*dt,dist-.72f);float nx=grafikX+dx/dist*step,nz=grafikZ+dz/dist*step;
-            int gh=terrainHeight((int)std::floor(nx),(int)std::floor(nz));
+            int gh=groundHeight((int)std::floor(nx),(int)std::floor(nz));
             if(std::abs((float)gh-grafikFeet)<=1.1f){grafikX=nx;grafikZ=nz;grafikFeet=(float)gh;}
         }
     }
@@ -468,12 +518,14 @@ class Game {
     }
     void frame(float dt){
         if(!running||!eglMakeCurrent(display,surface,surface,context))return;dt=std::min(dt,.04f);
-        if(playerDead){swallowTimer+=dt;if(swallowTimer>2.8f){playerDead=false;swallowTimer=0;health=10;armor=10;px=0;pz=0;feet=(float)terrainHeight(0,0);vy=0;grounded=true;grafikX=6;grafikZ=-5;grafikFeet=(float)terrainHeight(6,-5);grafikAlive=true;grafikHealth=2;} }
+        if(!inWorld){glViewport(0,0,width,height);glClearColor(.10f,.18f,.25f,1);glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);drawMenu();eglSwapBuffers(display,surface);return;}
+        if(playerDead){swallowTimer+=dt;if(swallowTimer>2.8f){playerDead=false;swallowTimer=0;health=10;armor=10;px=0;pz=0;feet=(float)groundHeight(0,0);vy=0;grounded=true;grafikX=6;grafikZ=-5;grafikFeet=(float)groundHeight(6,-5);grafikAlive=true;grafikHealth=2;} }
         if(!playerDead){
         float forward=joyY,side=joyX,mag=std::sqrt(forward*forward+side*side);if(mag>1){forward/=mag;side/=mag;}
-        float speed=5.2f;movePlayer((std::sin(yaw)*forward+std::cos(yaw)*side)*speed*dt,(-std::cos(yaw)*forward+std::sin(yaw)*side)*speed*dt);
-        if(grounded&&!supported())grounded=false;
-        if(!grounded){vy-=22*dt;float next=feet+vy*dt;if(vy<=0){int bx=(int)std::floor(px),bz=(int)std::floor(pz),by=(int)std::floor(next-.01f);
+        bool swimming=inWater();float speed=swimming?2.8f:5.2f;movePlayer((std::sin(yaw)*forward+std::cos(yaw)*side)*speed*dt,(-std::cos(yaw)*forward+std::sin(yaw)*side)*speed*dt);
+        if(swimming){grounded=false;vy-=2.0f*dt;if(feet+1.2f<SEA_LEVEL)vy+=5.0f*dt;vy*=.94f;vy=std::clamp(vy,-2.0f,3.0f);feet+=vy*dt;}
+        else {if(grounded&&!supported())grounded=false;}
+        if(!grounded&&!swimming){vy-=22*dt;float next=feet+vy*dt;if(vy<=0){int bx=(int)std::floor(px),bz=(int)std::floor(pz),by=(int)std::floor(next-.01f);
             if(solid(bx,by,bz)||solid((int)std::floor(px-.25f),by,(int)std::floor(pz-.25f))||
                solid((int)std::floor(px+.25f),by,(int)std::floor(pz+.25f))||
                solid((int)std::floor(px-.25f),by,(int)std::floor(pz+.25f))||
@@ -486,6 +538,7 @@ class Game {
         }
         updateGrafik(dt);
         updateLan(dt);
+        if(inWorld){saveTimer+=dt;if(saveTimer>=12.0f){saveWorld();saveTimer=0;}}
         updateWorld();
         glViewport(0,0,width,height);glClearColor(.48f,.74f,.96f,1);glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
         Mat4 vp=mul(perspective(1.02f,(float)width/height,.1f,180),camera(px,feet+1.62f,pz,yaw,pitch));
@@ -511,26 +564,41 @@ class Game {
         }
         if(inventoryOpen)drawInventory();else drawHud();eglSwapBuffers(display,surface);
     }
+    void drawMenu(){
+        glDisable(GL_DEPTH_TEST);std::vector<float>v;
+        addFace(v,{-.78f,-.86f,0},{.78f,-.86f,0},{.78f,.86f,0},{-.78f,.86f,0},{.035f,.055f,.075f});
+        addFace(v,{-.74f,-.82f,0},{.74f,-.82f,0},{.74f,.82f,0},{-.74f,.82f,0},{.10f,.15f,.19f});
+        draw(v,GL_TRIANGLES,identity(),0,0,0,false);drawText("DEATH CRAFT",-.37f,.68f,.045f,{.45f,.88f,1});
+        std::vector<float>b;auto button=[&](float x,float y,float w,float h,V3 c){addFace(b,{x,y,0},{x+w,y,0},{x+w,y+h,0},{x,y+h,0},c);};
+        button(-.62f,.34f,.58f,.20f,creativeMode?V3{.16f,.52f,.25f}:V3{.08f,.10f,.12f});button(.04f,.34f,.58f,.20f,!creativeMode?V3{.16f,.52f,.25f}:V3{.08f,.10f,.12f});
+        button(-.62f,.04f,.58f,.20f,flatWorld?V3{.16f,.52f,.25f}:V3{.08f,.10f,.12f});button(.04f,.04f,.58f,.20f,!flatWorld?V3{.16f,.52f,.25f}:V3{.08f,.10f,.12f});
+        for(int i=0;i<3;i++)button(-.62f+i*.44f,-.36f,.38f,.18f,selectedSlot==i?V3{.55f,.37f,.12f}:V3{.08f,.10f,.12f});
+        button(-.24f,-.70f,.48f,.22f,{.12f,.42f,.68f});draw(b,GL_TRIANGLES,identity(),0,0,0,false);
+        drawText("CREATIVE",-.55f,.405f,.017f,{1,1,1});drawText("SURVIVAL",.10f,.405f,.017f,{1,1,1});drawText("FLAT",-.48f,.105f,.022f,{1,1,1});drawText("NORMAL",.10f,.105f,.018f,{1,1,1});
+        for(int i=0;i<3;i++)drawText("SLOT "+std::to_string(i+1),-.59f+i*.44f,-.30f,.014f,{1,1,1});
+        drawText("START",-.15f,-.63f,.025f,{1,1,1});drawText("MODE",-.08f,.60f,.018f,{.8f,.85f,.9f});drawText("WORLD TYPE",-.20f,.28f,.018f,{.8f,.85f,.9f});drawText("SAVE SLOT",-.18f,-.12f,.018f,{.8f,.85f,.9f});glEnable(GL_DEPTH_TEST);
+    }
     void setJoy(float x,float y){joyX=std::clamp((x-joyOriginX)/.20f,-1.0f,1.0f);joyY=std::clamp((y-joyOriginY)/.20f,-1.0f,1.0f);}
 public:
-    bool init(ANativeWindow*w,AAssetManager* manager){
+    bool init(ANativeWindow*w,AAssetManager* manager,const char* dataDir){
         const EGLint attrs[]={EGL_RENDERABLE_TYPE,EGL_OPENGL_ES3_BIT,EGL_SURFACE_TYPE,EGL_WINDOW_BIT,EGL_RED_SIZE,8,EGL_GREEN_SIZE,8,EGL_BLUE_SIZE,8,EGL_ALPHA_SIZE,8,EGL_DEPTH_SIZE,16,EGL_NONE};
         display=eglGetDisplay(EGL_DEFAULT_DISPLAY);if(display==EGL_NO_DISPLAY||!eglInitialize(display,nullptr,nullptr))return false;
         EGLConfig cfg;EGLint count=0;eglChooseConfig(display,attrs,&cfg,1,&count);if(!count)return false;
         const EGLint ca[]={EGL_CONTEXT_CLIENT_VERSION,3,EGL_NONE};context=eglCreateContext(display,cfg,EGL_NO_CONTEXT,ca);surface=eglCreateWindowSurface(display,cfg,w,nullptr);
         if(context==EGL_NO_CONTEXT||surface==EGL_NO_SURFACE||!eglMakeCurrent(display,surface,surface,context))return false;
         eglQuerySurface(display,surface,EGL_WIDTH,&width);eglQuerySurface(display,surface,EGL_HEIGHT,&height);glViewport(0,0,width,height);
-        if(!setupGL())return false;loadTextures(manager);feet=(float)terrainHeight(0,0);grafikFeet=(float)terrainHeight((int)grafikX,(int)grafikZ);health=10;armor=10;grafikHealth=2;inventory[0]={1,999999};inventory[1]={2,999999};inventory[2]={3,999999};inventory[3]={4,999999};inventory[4]={5,999999};inventory[5]={6,999999};inventory[6]={7,999999};inventory[7]={8,999999};selected=0;running=true;updateWorld();return true;
+        if(!setupGL())return false;loadTextures(manager);saveDirectory=dataDir?dataDir:".";feet=1;grafikFeet=1;health=10;armor=10;grafikHealth=2;selected=0;running=true;inWorld=false;return true;
     }
     int input(AInputEvent*e){
         if(AInputEvent_getType(e)!=AINPUT_EVENT_TYPE_MOTION)return 0;int action=AMotionEvent_getAction(e)&AMOTION_EVENT_ACTION_MASK,idx=(AMotionEvent_getAction(e)&AMOTION_EVENT_ACTION_POINTER_INDEX_MASK)>>AMOTION_EVENT_ACTION_POINTER_INDEX_SHIFT;int id=AMotionEvent_getPointerId(e,idx);float x=AMotionEvent_getX(e,idx)/width*2-1,y=1-AMotionEvent_getY(e,idx)/height*2;
         if(action==AMOTION_EVENT_ACTION_DOWN||action==AMOTION_EVENT_ACTION_POINTER_DOWN){
+            if(!inWorld){if(y>.32f){creativeMode=x<0;return 1;}if(y>.02f&&y<.27f){flatWorld=x<0;return 1;}if(y>-.40f&&y<-.12f){selectedSlot=std::clamp((int)((x+.62f)/.44f),0,2);return 1;}if(y<-.52f){startWorld();return 1;}return 1;}
             if(inventoryOpen){if(x>.62f&&y>.55f){inventoryOpen=false;dragIndex=-1;return 1;}if(x>.55f&&x<.80f&&y>.20f&&y<.43f){craft(0);return 1;}if(x>.55f&&x<.80f&&y>-.08f&&y<.16f){craft(1);return 1;}if(x>.55f&&x<.80f&&y>-.38f&&y<-.12f){craft(2);return 1;}int slot=inventorySlotAt(x,y);if(slot>=0){dragIndex=slot;dragPointer=id;}return 1;}
             if(x>-.95f&&x<-.72f&&y>.55f&&y<.73f){setLanMode(1);return 1;}
             if(x>-.72f&&x<-.47f&&y>.55f&&y<.73f){setLanMode(2);return 1;}
             if(x>.81f&&y>.72f){inventoryOpen=true;joyId=lookId=-1;joyX=joyY=0;breaking=false;return 1;}
             if(x<-.42f&&y<0){joyId=id;joyOriginX=x;joyOriginY=y;setJoy(x,y);}
-            else if(x>.65f&&y<-.43f){if(grounded){vy=7.4f;grounded=false;}}
+            else if(x>.65f&&y<-.43f){if(inWater()){vy=3.4f;grounded=false;}else if(grounded){vy=7.4f;grounded=false;}}
             else if(x>.65f&&y>-.34f&&y<.12f){int tx,ty,tz,ax,ay,az;if(raycast(tx,ty,tz,ax,ay,az)){breaking=true;breakPointer=id;breakX=tx;breakY=ty;breakZ=tz;breakTimer=0;}}
             else if(x>.40f&&x<.66f&&y>-.54f&&y<-.25f)editBlock(true);
             else if(x>.38f&&x<.64f&&y>-.22f&&y<.03f)attackGrafik();
@@ -540,12 +608,13 @@ public:
         if(action==AMOTION_EVENT_ACTION_MOVE){for(size_t n=0;n<AMotionEvent_getPointerCount(e);n++){int pid=AMotionEvent_getPointerId(e,n);float tx=AMotionEvent_getX(e,n)/width*2-1,ty=1-AMotionEvent_getY(e,n)/height*2;if(pid==joyId)setJoy(tx,ty);if(pid==lookId){yaw+=(tx-lastX)*1.45f;pitch=std::clamp(pitch-(ty-lastY)*1.15f,-1.35f,1.35f);lastX=tx;lastY=ty;}}return 1;}
         if(action==AMOTION_EVENT_ACTION_UP||action==AMOTION_EVENT_ACTION_POINTER_UP||action==AMOTION_EVENT_ACTION_CANCEL){if(action==AMOTION_EVENT_ACTION_CANCEL){joyId=lookId=breakPointer=dragPointer=-1;joyX=joyY=0;breaking=false;dragIndex=-1;return 1;}if(id==joyId){joyId=-1;joyX=joyY=0;}if(id==lookId)lookId=-1;if(id==breakPointer){breakPointer=-1;breaking=false;breakTimer=0;}if(inventoryOpen&&id==dragPointer&&dragIndex>=0){int target=inventorySlotAt(x,y);if(target>=0&&target!=dragIndex)std::swap(inventory[target],inventory[dragIndex]);dragIndex=dragPointer=-1;}return 1;}return 1;
     }
-    void shutdown(){running=false;if(lanSocket>=0){close(lanSocket);lanSocket=-1;}lanMode=0;remoteValid=false;if(display!=EGL_NO_DISPLAY){eglMakeCurrent(display,EGL_NO_SURFACE,EGL_NO_SURFACE,EGL_NO_CONTEXT);if(context!=EGL_NO_CONTEXT)eglDestroyContext(display,context);if(surface!=EGL_NO_SURFACE)eglDestroySurface(display,surface);eglTerminate(display);}display=EGL_NO_DISPLAY;surface=EGL_NO_SURFACE;context=EGL_NO_CONTEXT;}
+    void shutdown(){if(inWorld)saveWorld();running=false;if(lanSocket>=0){close(lanSocket);lanSocket=-1;}lanMode=0;remoteValid=false;if(display!=EGL_NO_DISPLAY){eglMakeCurrent(display,EGL_NO_SURFACE,EGL_NO_SURFACE,EGL_NO_CONTEXT);if(context!=EGL_NO_CONTEXT)eglDestroyContext(display,context);if(surface!=EGL_NO_SURFACE)eglDestroySurface(display,surface);eglTerminate(display);}display=EGL_NO_DISPLAY;surface=EGL_NO_SURFACE;context=EGL_NO_CONTEXT;}
     void tick(float dt){frame(dt);}
+    void save(){saveWorld();}
     bool isRunning() const { return running; }
 };
 static Game game;
-static void command(android_app*app,int32_t cmd){if(cmd==APP_CMD_INIT_WINDOW&&app->window){if(!game.init(app->window,app->activity->assetManager))LOGE("Game initialization failed");}if(cmd==APP_CMD_TERM_WINDOW)game.shutdown();}
+static void command(android_app*app,int32_t cmd){if(cmd==APP_CMD_PAUSE)game.save();if(cmd==APP_CMD_INIT_WINDOW&&app->window){if(!game.init(app->window,app->activity->assetManager,app->activity->internalDataPath))LOGE("Game initialization failed");}if(cmd==APP_CMD_TERM_WINDOW)game.shutdown();}
 void android_main(android_app*app){
     app->onAppCmd=command;app->onInputEvent=[](android_app*,AInputEvent*e)->int{return game.input(e);};int64_t previous=0;
     while(true){int events;android_poll_source*source;while(ALooper_pollOnce(game.isRunning()?0:-1,nullptr,&events,(void**)&source)>=0){if(source)source->process(app,source);if(app->destroyRequested){game.shutdown();return;}}
