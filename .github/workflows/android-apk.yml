@@ -36,6 +36,18 @@ jobs:
         with:
           gradle-version: '8.9'
 
+      - name: Cache Android SDK components
+        uses: actions/cache@v4
+        with:
+          path: |
+            ${{ env.ANDROID_HOME }}/platforms/android-35
+            ${{ env.ANDROID_HOME }}/build-tools/35.0.0
+            ${{ env.ANDROID_HOME }}/cmake/3.22.1
+            ${{ env.ANDROID_HOME }}/ndk/27.2.12479018
+          key: ${{ runner.os }}-android-sdk-platform35-buildtools3500-cmake3221-ndk27212479018
+          restore-keys: |
+            ${{ runner.os }}-android-sdk-
+
       - name: Install Android SDK components
         run: |
           sdkmanager --install "platforms;android-35" "build-tools;35.0.0" "cmake;3.22.1" "ndk;27.2.12479018"
