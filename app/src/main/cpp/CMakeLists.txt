@@ -11,6 +11,11 @@ target_include_directories(android_native_app_glue PUBLIC
 add_library(deathcraft SHARED main.cpp)
 target_compile_features(deathcraft PRIVATE cxx_std_20)
 target_compile_options(deathcraft PRIVATE -O2 -Wall -Wextra)
+
+# NativeActivity locates this entry point dynamically with dlsym().
+# Force the linker to extract ANativeActivity_onCreate from the static glue archive.
+target_link_options(deathcraft PRIVATE "-Wl,-u,ANativeActivity_onCreate")
+
 target_link_libraries(deathcraft
     android_native_app_glue
     android
