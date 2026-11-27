@@ -169,7 +169,7 @@ class Game {
         r(-.78f,-.73f,1.56f,1.43f,{.03f,.03f,.04f});r(-.75f,-.70f,1.50f,1.37f,{.13f,.14f,.16f});
         for(int i=0;i<20;i++){int row=i/5,col=i%5;float x=-.58f+col*.235f,y=.30f-row*.245f;r(x,y-.19f,.19f,.21f,i==selected?V3{.72f,.52f,.14f}:V3{.025f,.025f,.03f});r(x+.008f,y-.182f,.174f,.194f,{.24f,.24f,.26f});if(inventory[i].count){r(x+.055f,y-.135f,.075f,.09f,blockColor(inventory[i].id,2));drawText(std::to_string(inventory[i].count),x+.125f,y-.17f,.012f,{1,1,1});}}
         r(.60f,.27f,.15f,.15f,{.02f,.02f,.025f});r(.60f,-.02f,.15f,.15f,{.02f,.02f,.025f});r(.60f,-.31f,.15f,.15f,{.02f,.02f,.025f});draw(v,GL_TRIANGLES,identity(),0,0,0,false);
-        drawText("INVENTORY",-.25f,.62f,.025f,{1,.85f,.35f});drawText("DRAG ITEMS",-.43f,-.66f,.016f,{1,1,1});drawText("PLANKS",.57f,.48f,.015f,{1,1,1});drawText("STICKS",.58f,.19f,.015f,{1,1,1});drawText("TABLE",.59f,-.10f,.015f,{1,1,1});drawText("X",.66f,.62f,.025f);glEnable(GL_DEPTH_TEST);
+        drawText("INVENTORY",-.25f,.62f,.025f,{1,.85f,.35f});drawText("DRAG ITEMS",-.43f,-.66f,.016f,{1,1,1});drawText("PLANKS",.57f,.48f,.015f,{1,1,1});drawText("STICKS",.58f,.19f,.015f,{1,1,1});drawText("TABLE",.59f,-.10f,.015f,{1,1,1});drawText("X",.66f,.62f,.025f,{1,1,1});glEnable(GL_DEPTH_TEST);
     }
     std::array<uint8_t,7> glyph(char c){
         switch(c){
@@ -199,15 +199,6 @@ class Game {
             addFace(v,{px0,py0,0},{px0+scale*.82f,py0,0},{px0+scale*.82f,py0+scale*.82f,0},{px0,py0+scale*.82f,0},color);
         }cursor+=scale*6;}
         Mat4 ortho=identity();draw(v,GL_TRIANGLES,ortho,0,0,0,false);
-    }
-    void drawMenu(){
-        std::vector<float> v;auto rect=[&](float x,float y,float w,float h,V3 c){addFace(v,{x,y,0},{x+w,y,0},{x+w,y+h,0},{x,y+h,0},c);};
-        rect(-.62f,-.48f,1.24f,.98f,{.14f,.21f,.23f});
-        rect(-.36f,-.20f,.72f,.22f,{.20f,.52f,.30f});
-        rect(-.36f,-.53f,.72f,.22f,{.25f,.31f,.34f});
-        draw(v,GL_TRIANGLES,identity(),0,0,0,false);
-        if(screen==Screen::MENU){drawText("DEATH CRAFT",-.39f,.30f,.040f,{1,.88f,.35f});drawText("TAP TO PLAY",-.26f,-.055f,.027f,{1,1,1});}
-        else {drawText("PAUSED",-.17f,.30f,.045f,{1,.88f,.35f});drawText("RESUME",-.17f,-.055f,.030f,{1,1,1});drawText("MAIN MENU",-.24f,-.385f,.026f,{1,1,1});}
     }
     bool overlaps(float x,float y,float z){
         const float radius=.30f;
