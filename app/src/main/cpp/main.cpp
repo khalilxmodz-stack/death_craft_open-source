@@ -10,6 +10,7 @@
 #include <algorithm>
 #include <cstdint>
 #include <string>
+#include <cctype>
 #include <initializer_list>
 #include <tuple>
 #include <time.h>
@@ -112,9 +113,14 @@ class Game {
         return it->second;
     }
     V3 blockColor(uint8_t b,int face){
-        if(b==1){if(face==2)return{.22f,.68f,.18f};return{.42f,.29f,.16f};}
-        if(b==2)return{.48f,.31f,.17f};
-        return{.43f,.45f,.48f};
+        V3 base;
+        if(b==1) base=face==2?V3{.28f,.72f,.22f}:V3{.43f,.30f,.17f};
+        else if(b==2) base={.52f,.34f,.19f};
+        else base={.48f,.50f,.54f};
+        // Directional face lighting gives blocks readable depth until shadow maps are added.
+        const float light[6]={.78f,.72f,1.0f,.48f,.62f,.86f};
+        float k=light[std::clamp(face,0,5)];
+        return {base.x*k,base.y*k,base.z*k};
     }
     void rebuild(Chunk&c){
         c.mesh.clear();int ox=c.cx*CS,oz=c.cz*CS;
@@ -180,6 +186,7 @@ class Game {
         glDisable(GL_CULL_FACE);glEnable(GL_DEPTH_TEST);
     }
     std::array<uint8_t,7> glyph(char c){
+        c=(char)std::toupper((unsigned char)c);
         switch(c){
         case 'A':return {14,17,17,31,17,17,17};case 'B':return {30,17,17,30,17,17,30};
         case 'C':return {14,17,16,16,16,17,14};case 'D':return {30,17,17,17,17,17,30};
@@ -214,20 +221,25 @@ class Game {
         rect(-.36f,-.20f,.72f,.22f,{.20f,.52f,.30f});
         rect(-.36f,-.53f,.72f,.22f,{.25f,.31f,.34f});
         draw(v,GL_TRIANGLES,identity(),0,0,0,false);
-        if(screen==Screen::MENU){drawText("DEATH CRAFT",-.39f,.30f,.040f,{1,.88f,.35f});drawText("TAP TO PLAY",-.26f,-.055f,.027f,{1,1,1});}
-        else {drawText("PAUSED",-.17f,.30f,.045f,{1,.88f,.35f});drawText("RESUME",-.17f,-.055f,.030f,{1,1,1});drawText("MAIN MENU",-.24f,-.385f,.026f,{1,1,1});}
+        if(screen==Screen::MENU){drawText("DEATH CRAFT",-.33f,.30f,.026f,{1,.88f,.35f});drawText("TAP TO PLAY",-.22f,-.055f,.020f,{1,1,1});}
+        else {drawText("PAUSED",-.20f,.30f,.036f,{1,.88f,.35f});drawText("RESUME",-.16f,-.055f,.024f,{1,1,1});drawText("MAIN MENU",-.20f,-.385f,.021f,{1,1,1});}
     }
     bool overlaps(float x,float y,float z){
         const float radius=.30f;
         for(int bx=(int)std::floor(x-radius);bx<=(int)std::floor(x+radius);bx++)
-        for(int by=(int)std::floor(y);by<=(int)std::floor(y+1.8f);by++)
+        for(int by=(int)std::floor(y);by<=(int)std::floor(y+1.8f-.001f);by++)
         for(int bz=(int)std::floor(z-radius);bz<=(int)std::floor(z+radius);bz++)
             if(solid(bx,by,bz))return true;
         return false;
     }
     void movePlayer(float dx,float dz){
-        float nx=px+dx;if(!overlaps(nx,feet,pz))px=nx;
-        float nz=pz+dz;if(!overlaps(px,feet,nz))pz=nz;
+        // Sub-stepping prevents fast movement from tunnelling through one-block walls.
+        int steps=std::max(1,(int)std::ceil(std::max(std::fabs(dx),std::fabs(dz))/.10f));
+        float sx=dx/(float)steps,sz=dz/(float)steps;
+        for(int i=0;i<steps;i++){
+            float nx=px+sx;if(!overlaps(nx,feet,pz))px=nx;
+            float nz=pz+sz;if(!overlaps(px,feet,nz))pz=nz;
+        }
     }
     bool raycast(int&hx,int&hy,int&hz,int&px0,int&py0,int&pz0){
         V3 d{std::sin(yaw)*std::cos(pitch),std::sin(pitch),-std::cos(yaw)*std::cos(pitch)};
@@ -325,7 +337,7 @@ public:
             for(size_t i=0;i<AMotionEvent_getPointerCount(e);i++){
                 int pid=AMotionEvent_getPointerId(e,i);float tx=AMotionEvent_getX(e,i)/width*2-1,ty=1-AMotionEvent_getY(e,i)/height*2;
                 if(pid==joyId)setJoy(tx,ty);
-                if(pid==lookId){yaw-=(tx-lastX)*2.7f;pitch=std::clamp(pitch-(ty-lastY)*2.2f,-1.35f,1.35f);lastX=tx;lastY=ty;}
+                if(pid==lookId){yaw+=(tx-lastX)*2.7f;pitch=std::clamp(pitch-(ty-lastY)*2.2f,-1.35f,1.35f);lastX=tx;lastY=ty;}
             }return 1;
         }
         if(action==AMOTION_EVENT_ACTION_UP||action==AMOTION_EVENT_ACTION_POINTER_UP||action==AMOTION_EVENT_ACTION_CANCEL){
