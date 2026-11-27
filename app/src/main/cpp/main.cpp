@@ -75,7 +75,7 @@ class Game {
         uniform mat4 mvp; uniform vec3 cameraPos; out vec3 color; out float fogDistance;
         void main(){gl_Position=mvp*vec4(p,1.0);color=c;fogDistance=length(p-cameraPos);})";
         const char*fs=R"(#version 300 es
-        precision mediump float; in vec3 color; in float fogDistance; uniform float fogEnabled; out vec4 outColor;
+        precision highp float; in vec3 color; in float fogDistance; uniform float fogEnabled; out vec4 outColor;
         void main(){vec3 sky=vec3(.48,.74,.96);float fog=fogEnabled*smoothstep(22.0,68.0,fogDistance);outColor=vec4(mix(color,sky,fog),1.0);})";
         GLuint a=makeShader(GL_VERTEX_SHADER,vs),b=makeShader(GL_FRAGMENT_SHADER,fs);
         program=glCreateProgram();glAttachShader(program,a);glAttachShader(program,b);glLinkProgram(program);glDeleteShader(a);glDeleteShader(b);
@@ -190,6 +190,7 @@ class Game {
         case 'P':return {30,17,17,30,16,16,16};case 'R':return {30,17,17,30,20,18,17};
         case 'S':return {15,16,16,14,1,1,30};case 'T':return {31,4,4,4,4,4,4};
         case 'U':return {17,17,17,17,17,17,14};case 'V':return {17,17,17,17,17,10,4};
+        case 'Y':return {17,17,10,4,4,4,4};
         case '0':return {14,17,19,21,25,17,14};case '1':return {4,12,4,4,4,4,14};
         case '2':return {14,17,1,2,4,8,31};case '3':return {30,1,1,14,1,1,30};
         case '4':return {2,6,10,18,31,2,2};case '5':return {31,16,16,30,1,1,30};
@@ -266,7 +267,7 @@ class Game {
         if(!running||!eglMakeCurrent(display,surface,surface,context))return;dt=std::min(dt,.04f);
         fpsElapsed+=dt;fpsFrames++;if(fpsElapsed>=.5f){fpsValue=(int)(fpsFrames/fpsElapsed);fpsFrames=0;fpsElapsed=0;}
         if(screen!=Screen::PLAYING){glViewport(0,0,width,height);glClearColor(.10f,.16f,.19f,1);glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);drawMenu();eglSwapBuffers(display,surface);return;}
-        float forward=-joyY,side=joyX,mag=std::sqrt(forward*forward+side*side);if(mag>1){forward/=mag;side/=mag;}
+        float forward=joyY,side=joyX,mag=std::sqrt(forward*forward+side*side);if(mag>1){forward/=mag;side/=mag;}
         float speed=5.2f;movePlayer((std::sin(yaw)*forward+std::cos(yaw)*side)*speed*dt,(-std::cos(yaw)*forward+std::sin(yaw)*side)*speed*dt);
         if(!grounded){vy-=22*dt;float next=feet+vy*dt;if(vy<=0){int bx=(int)std::floor(px),bz=(int)std::floor(pz),by=(int)std::floor(next-.01f);
             if(solid(bx,by,bz)||solid((int)std::floor(px-.25f),by,(int)std::floor(pz-.25f))||
@@ -279,7 +280,7 @@ class Game {
         if(grounded&&feet<1.001f)feet=1.0f;
         updateWorld();
         glViewport(0,0,width,height);glClearColor(.48f,.74f,.96f,1);glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
-        Mat4 vp=mul(perspective(1.12f,(float)width/height,.1f,150),camera(px,feet+1.62f,pz,yaw,pitch));
+        Mat4 vp=mul(perspective(1.02f,(float)width/height,.1f,180),camera(px,feet+1.62f,pz,yaw,pitch));
         for(auto&entry:chunks)draw(entry.second.mesh,GL_TRIANGLES,vp,px,feet+1.62f,pz,true);
         // Target outline around the block under the crosshair.
         int x,y,z,ax,ay,az;if(raycast(x,y,z,ax,ay,az)){
@@ -309,8 +310,8 @@ public:
         int idx=(AMotionEvent_getAction(e)&AMOTION_EVENT_ACTION_POINTER_INDEX_MASK)>>AMOTION_EVENT_ACTION_POINTER_INDEX_SHIFT;
         int id=AMotionEvent_getPointerId(e,idx);float x=AMotionEvent_getX(e,idx)/width*2-1,y=1-AMotionEvent_getY(e,idx)/height*2;
         if(action==AMOTION_EVENT_ACTION_DOWN||action==AMOTION_EVENT_ACTION_POINTER_DOWN){
-            if(screen==Screen::MENU){if(y>-.35f&&y<.35f){screen=Screen::PLAYING;}return 1;}
-            if(screen==Screen::PAUSED){if(y>-.15f&&y<.35f){screen=Screen::PLAYING;}else if(y<-.25f&&y>-.75f){screen=Screen::MENU;}return 1;}
+            if(screen==Screen::MENU){if(x>-.42f&&x<.42f&&y>-.25f&&y<.12f){screen=Screen::PLAYING;}return 1;}
+            if(screen==Screen::PAUSED){if(x>-.42f&&x<.42f&&y>-.18f&&y<.12f){screen=Screen::PLAYING;}else if(x>-.42f&&x<.42f&&y<-.30f&&y>-.62f){screen=Screen::MENU;}return 1;}
             if(x>.80f&&y>.78f){screen=Screen::PAUSED;joyId=lookId=-1;joyX=joyY=0;return 1;}
             if(x<-.42f&&y<.0f){joyId=id;joyOriginX=x;joyOriginY=y;setJoy(x,y);}
             else if(x>.67f&&y<-.40f){if(grounded){vy=7.4f;grounded=false;}}
