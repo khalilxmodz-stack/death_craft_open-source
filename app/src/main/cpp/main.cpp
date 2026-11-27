@@ -86,6 +86,9 @@ class Game {
     bool inventoryOpen=false,breaking=false;
     int selected=0,breakPointer=-1,breakX=0,breakY=0,breakZ=0,dragIndex=-1,dragPointer=-1;
     float breakTimer=0;
+    int health=10,armor=10,grafikHealth=2;
+    float grafikX=5.0f,grafikZ=-5.0f,grafikFeet=0,grafikRespawn=0,swallowTimer=0;
+    bool grafikAlive=true,playerDead=false;
     struct Item{uint8_t id=0;int count=0;};std::array<Item,20> inventory{};
     std::string status="DEATH_CRAFT  |  V0.1";
     int statusFrames=0;
@@ -115,11 +118,16 @@ class Game {
     }
     bool loadTextures(AAssetManager* manager){
         if(!manager)return false;
-        constexpr int tile=256, atlasW=tile*3;
+        constexpr int tile=256, atlasW=tile*4;
         std::vector<unsigned char> atlas((size_t)atlasW*tile*4,255);
-        const char* names[]={"textures/grass_texture.png","textures/dirt_texture.png","textures/stone_texture.png"};
+        const char* names[]={"textures/grass_texture.png","textures/dirt_texture.png","textures/stone_texture.png","textures/grass_tree_texture.png"};
+        const unsigned char fallback[4][4]={{78,156,55,255},{126,79,43,255},{116,122,130,255},{49,126,48,255}};
+        for(int layer=0;layer<4;layer++)for(int y=0;y<tile;y++)for(int x=0;x<tile;x++){
+            size_t dst=((size_t)y*atlasW+(size_t)layer*tile+x)*4;
+            std::copy(fallback[layer],fallback[layer]+4,atlas.begin()+dst);
+        }
         int loaded=0;stbi_set_flip_vertically_on_load(1);
-        for(int layer=0;layer<3;layer++){
+        for(int layer=0;layer<4;layer++){
             AAsset* asset=AAssetManager_open(manager,names[layer],AASSET_MODE_BUFFER);
             if(!asset){LOGE("Texture asset missing: %s",names[layer]);continue;}
             off_t length=AAsset_getLength(asset);std::vector<unsigned char> encoded((size_t)length);
@@ -145,8 +153,8 @@ class Game {
         return it==chunks.end()?0:it->second.get(modp(x,CS),y,modp(z,CS));
     }
     void addBlockFace(std::vector<float>&v,V3 a,V3 b,V3 c,V3 d,uint8_t block,int face,int gx,int gy,int gz){
-        int tile=block==3?2:((block==5||(block==1&&face==2))?0:1);
-        float u0=(tile+.012f)/3.0f,u1=(tile+.988f)/3.0f,v0=.012f,v1=.988f;
+        int tile=block==3?2:(block==5?3:((block==1&&face==2)?0:1));
+        float u0=(tile+.012f)/4.0f,u1=(tile+.988f)/4.0f,v0=.012f,v1=.988f;
         const float shade[6]={.72f,.84f,1.0f,.38f,.62f,.78f};float light=shade[face];
         if(block==1&&face==2){
             bool underTree=false;
@@ -246,9 +254,11 @@ class Game {
         circ(.78f,-.62f,.14f,{.01f,.01f,.015f});circ(.78f,-.62f,.115f,{.17f,.17f,.19f});
         circ(.78f,-.10f,.14f,{.01f,.01f,.015f});circ(.78f,-.10f,.115f,{.17f,.17f,.19f});
         circ(.53f,-.40f,.14f,{.01f,.01f,.015f});circ(.53f,-.40f,.115f,{.17f,.17f,.19f});
+        circ(.53f,-.10f,.14f,{.01f,.01f,.015f});circ(.53f,-.10f,.115f,{.17f,.17f,.19f});
         line(.78f,-.65f,.78f,-.56f,.018f,{1,1,1});line(.78f,-.56f,.74f,-.60f,.018f,{1,1,1});line(.78f,-.56f,.82f,-.60f,.018f,{1,1,1});
         line(.72f,-.12f,.84f,-.02f,.018f,{1,1,1});line(.73f,-.02f,.85f,-.02f,.018f,{1,1,1});
         line(.48f,-.45f,.58f,-.45f,.014f,{1,1,1});line(.48f,-.45f,.48f,-.35f,.014f,{1,1,1});line(.58f,-.45f,.58f,-.35f,.014f,{1,1,1});line(.48f,-.35f,.58f,-.35f,.014f,{1,1,1});
+        line(.49f,-.14f,.57f,-.06f,.018f,{1,.35f,.25f});line(.50f,-.07f,.56f,-.13f,.018f,{1,.35f,.25f});
         line(-.034f,0,-.009f,0,.006f,{.015f,.015f,.02f});line(.009f,0,.034f,0,.006f,{.015f,.015f,.02f});
         line(0,-.034f,0,-.009f,.006f,{.015f,.015f,.02f});line(0,.009f,0,.034f,.006f,{.015f,.015f,.02f});
         line(-.032f,0,-.009f,0,.0025f,{1,1,1});line(.009f,0,.032f,0,.0025f,{1,1,1});
@@ -265,9 +275,17 @@ class Game {
                 }
             }
         }
+        for(int i=0;i<5;i++){
+            float hx=-.91f+i*.075f,hy=.88f;V3 hc=health>=((i+1)*2)?V3{.92f,.10f,.14f}:(health==i*2+1?V3{.92f,.42f,.12f}:V3{.20f,.08f,.09f});
+            circ(hx-.012f,hy+.006f,.020f,hc);circ(hx+.012f,hy+.006f,.020f,hc);t(hx-.032f,hy,hx+.032f,hy,hx,hy-.050f,hc);
+            float sx=-.91f+i*.075f,sy=.77f;V3 sc=armor>=((i+1)*2)?V3{.30f,.67f,.95f}:V3{.13f,.19f,.24f};
+            t(sx-.026f,sy+.025f,sx+.026f,sy+.025f,sx,sy-.042f,sc);t(sx-.026f,sy+.025f,sx,sy-.042f,sx-.022f,sy-.005f,sc);t(sx+.026f,sy+.025f,sx+.022f,sy-.005f,sx,sy-.042f,sc);
+        }
         rect(.84f,.79f,.13f,.15f,{.01f,.01f,.015f});rect(.86f,.81f,.09f,.11f,{.2f,.2f,.22f});line(.87f,.87f,.94f,.87f,.009f,{1,1,1});line(.87f,.83f,.94f,.83f,.009f,{1,1,1});
         for(int i=0;i<5;i++){float x=-.28f+i*.115f;rect(x,-.92f,.105f,.16f,i==selected?V3{1,.78f,.18f}:V3{.01f,.01f,.015f});rect(x+.008f,-.912f,.089f,.144f,{.2f,.2f,.22f});if(inventory[i].count){rect(x+.025f,-.88f,.055f,.075f,blockColor(inventory[i].id,2));drawText(std::to_string(inventory[i].count),x+.060f,-.89f,.010f,{1,1,1});}}
-        draw(v,GL_TRIANGLES,m,0,0,0,false);if(statusFrames>0){drawText(status,-.85f,.72f,.018f,{1,1,1});statusFrames--;}glEnable(GL_DEPTH_TEST);
+        draw(v,GL_TRIANGLES,m,0,0,0,false);if(statusFrames>0){drawText(status,-.85f,.66f,.018f,{1,1,1});statusFrames--;}
+        if(playerDead){float k=std::clamp(swallowTimer/2.8f,0.0f,1.0f);std::vector<float> overlay;addFace(overlay,{-1,-1,0},{1,-1,0},{1,1,0},{-1,1,0},{.015f+.035f*k,.005f,.018f+.025f*k});draw(overlay,GL_TRIANGLES,identity(),0,0,0,false);std::vector<float>mouth;for(int i=0;i<48;i++){float a=i*2*PI/48,b=(i+1)*2*PI/48;addTri(mouth,{0,0,0},{std::cos(a)*(.10f+.70f*k),std::sin(a)*(.10f+.70f*k),0},{std::cos(b)*(.10f+.70f*k),std::sin(b)*(.10f+.70f*k),0},{.005f,.002f,.008f});}draw(mouth,GL_TRIANGLES,identity(),0,0,0,false);drawText("GRAFIK ATE YOU",-.52f,-.72f,.035f,{1,.25f,.30f});}
+        glEnable(GL_DEPTH_TEST);
     }
     void drawInventory(){
         glDisable(GL_DEPTH_TEST);std::vector<float>v;auto r=[&](float x,float y,float w,float h,V3 c){addFace(v,{x,y,0},{x+w,y,0},{x+w,y+h,0},{x,y+h,0},c);};
@@ -313,13 +331,33 @@ class Game {
             if(solid(bx,by,bz))return true;
         return false;
     }
+    float groundAt(float x,float z,float reference)const{
+        int bx=(int)std::floor(x),bz=(int)std::floor(z);
+        for(int y=(int)std::floor(reference+1.05f);y>=(int)std::floor(reference-.20f);y--)
+            if(solid(bx,y,bz))return (float)y+1.0f;
+        return reference;
+    }
+    bool supported()const{
+        const float r=.23f;float samples[5][2]={{px,pz},{px-r,pz-r},{px+r,pz-r},{px-r,pz+r},{px+r,pz+r}};
+        for(auto&q:samples)if(solid((int)std::floor(q[0]),(int)std::floor(feet-.06f),(int)std::floor(q[1])))return true;
+        return false;
+    }
+    bool tryStep(float nx,float nz){
+        const float r=.23f;float samples[5][2]={{nx,nz},{nx-r,nz-r},{nx+r,nz-r},{nx-r,nz+r},{nx+r,nz+r}};
+        float target=feet;
+        for(auto&q:samples)target=std::max(target,groundAt(q[0],q[1],feet));
+        if(target>feet+.02f&&target<=feet+1.01f&&!overlaps(nx,target,nz)){
+            px=nx;pz=nz;feet=target;vy=0;grounded=true;return true;
+        }
+        return false;
+    }
     void movePlayer(float dx,float dz){
         float distance=std::max(std::abs(dx),std::abs(dz));
-        int steps=std::max(1,(int)std::ceil(distance/.18f));
+        int steps=std::max(1,(int)std::ceil(distance/.14f));
         float sx=dx/steps,sz=dz/steps;
         for(int i=0;i<steps;i++){
-            float nx=px+sx;if(!overlaps(nx,feet,pz))px=nx;
-            float nz=pz+sz;if(!overlaps(px,feet,nz))pz=nz;
+            float nx=px+sx;if(!overlaps(nx,feet,pz))px=nx;else tryStep(nx,pz);
+            float nz=pz+sz;if(!overlaps(px,feet,nz))pz=nz;else tryStep(px,nz);
         }
     }
     bool raycast(int&hx,int&hy,int&hz,int&px0,int&py0,int&pz0){
@@ -346,6 +384,26 @@ class Game {
         for(auto&entry:chunks)entry.second.dirty=true;
         status=place?"Block placed":"Block broken";statusFrames=60;
     }
+    void attackGrafik(){
+        if(!grafikAlive||playerDead)return;
+        float dx=grafikX-px,dz=grafikZ-pz,dist=std::sqrt(dx*dx+dz*dz);
+        float fx=std::sin(yaw),fz=-std::cos(yaw);
+        float facing=dist>.001f?(dx*fx+dz*fz)/dist:1.0f;
+        if(dist<=3.4f&&facing>.35f){
+            grafikHealth--;status=grafikHealth<=0?"GRAFIK DEFEATED":"GRAFIK HIT";statusFrames=90;
+            if(grafikHealth<=0){grafikAlive=false;grafikRespawn=0;}
+        }else{status="GRAFIK OUT OF REACH";statusFrames=70;}
+    }
+    void updateGrafik(float dt){
+        if(!grafikAlive){grafikRespawn+=dt;if(grafikRespawn>18.0f){grafikAlive=true;grafikHealth=2;grafikX=px+6.0f;grafikZ=pz-5.0f;grafikFeet=(float)terrainHeight((int)std::floor(grafikX),(int)std::floor(grafikZ));}return;}
+        if(playerDead)return;
+        float dx=px-grafikX,dz=pz-grafikZ,dist=std::sqrt(dx*dx+dz*dz);
+        if(dist<.82f){playerDead=true;swallowTimer=.001f;return;}
+        if(dist>1.0f){float step=std::min(1.65f*dt,dist-.72f);float nx=grafikX+dx/dist*step,nz=grafikZ+dz/dist*step;
+            int gh=terrainHeight((int)std::floor(nx),(int)std::floor(nz));
+            if(std::abs((float)gh-grafikFeet)<=1.1f){grafikX=nx;grafikZ=nz;grafikFeet=(float)gh;}
+        }
+    }
     void updateWorld(){
         int cx=floorDiv((int)std::floor(px),CS),cz=floorDiv((int)std::floor(pz),CS);
         for(int z=-LOAD_RADIUS;z<=LOAD_RADIUS;z++)for(int x=-LOAD_RADIUS;x<=LOAD_RADIUS;x++)ensureChunk(cx+x,cz+z);
@@ -356,8 +414,11 @@ class Game {
     }
     void frame(float dt){
         if(!running||!eglMakeCurrent(display,surface,surface,context))return;dt=std::min(dt,.04f);
+        if(playerDead){swallowTimer+=dt;if(swallowTimer>2.8f){playerDead=false;swallowTimer=0;health=10;armor=10;px=0;pz=0;feet=(float)terrainHeight(0,0);vy=0;grounded=true;grafikX=6;grafikZ=-5;grafikFeet=(float)terrainHeight(6,-5);grafikAlive=true;grafikHealth=2;} }
+        if(!playerDead){
         float forward=joyY,side=joyX,mag=std::sqrt(forward*forward+side*side);if(mag>1){forward/=mag;side/=mag;}
         float speed=5.2f;movePlayer((std::sin(yaw)*forward+std::cos(yaw)*side)*speed*dt,(-std::cos(yaw)*forward+std::sin(yaw)*side)*speed*dt);
+        if(grounded&&!supported())grounded=false;
         if(!grounded){vy-=22*dt;float next=feet+vy*dt;if(vy<=0){int bx=(int)std::floor(px),bz=(int)std::floor(pz),by=(int)std::floor(next-.01f);
             if(solid(bx,by,bz)||solid((int)std::floor(px-.25f),by,(int)std::floor(pz-.25f))||
                solid((int)std::floor(px+.25f),by,(int)std::floor(pz+.25f))||
@@ -368,10 +429,17 @@ class Game {
         // Keep the feet on the surface of the generated grass layer.
         if(grounded&&feet<1.001f)feet=1.0f;
         if(breaking){int tx,ty,tz,ax,ay,az;if(raycast(tx,ty,tz,ax,ay,az)){if(tx!=breakX||ty!=breakY||tz!=breakZ){breakX=tx;breakY=ty;breakZ=tz;breakTimer=0;}auto it=chunks.find(chunkKey(floorDiv(tx,CS),floorDiv(tz,CS)));uint8_t q=it==chunks.end()?0:it->second.get(modp(tx,CS),ty,modp(tz,CS));breakTimer+=dt;if(q&&breakTimer>=breakDuration(q)){editBlock(false);breaking=false;breakTimer=0;}}else breakTimer=0;}
+        }
+        updateGrafik(dt);
         updateWorld();
         glViewport(0,0,width,height);glClearColor(.48f,.74f,.96f,1);glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
         Mat4 vp=mul(perspective(1.02f,(float)width/height,.1f,180),camera(px,feet+1.62f,pz,yaw,pitch));
         for(auto&entry:chunks)draw(entry.second.mesh,GL_TRIANGLES,vp,px,feet+1.62f,pz,true,true);
+        if(grafikAlive){
+            std::vector<float> sphere;auto point=[&](float lat,float lon){return V3{grafikX+.58f*std::cos(lat)*std::sin(lon),grafikFeet+.62f+.58f*std::sin(lat),grafikZ+.58f*std::cos(lat)*std::cos(lon)};};
+            for(int iy=0;iy<10;iy++){float a0=-PI*.5f+PI*iy/10.0f,a1=-PI*.5f+PI*(iy+1)/10.0f;for(int ix=0;ix<16;ix++){float b0=2*PI*ix/16.0f,b1=2*PI*(ix+1)/16.0f;V3 p0=point(a0,b0),p1=point(a0,b1),p2=point(a1,b1),p3=point(a1,b0);float shade=.72f+.28f*std::max(0.0f,std::sin((a0+a1)*.5f));V3 c{.48f*shade,.12f*shade,.68f*shade};addTri(sphere,p0,p1,p2,c);addTri(sphere,p0,p2,p3,c);}}
+            draw(sphere,GL_TRIANGLES,vp,px,feet+1.62f,pz,true,false);
+        }
         // Target outline around the block under the crosshair.
         int x,y,z,ax,ay,az;if(raycast(x,y,z,ax,ay,az)){
             float X=x,Y=y,Z=z;std::vector<float> edge;
@@ -392,7 +460,7 @@ public:
         const EGLint ca[]={EGL_CONTEXT_CLIENT_VERSION,3,EGL_NONE};context=eglCreateContext(display,cfg,EGL_NO_CONTEXT,ca);surface=eglCreateWindowSurface(display,cfg,w,nullptr);
         if(context==EGL_NO_CONTEXT||surface==EGL_NO_SURFACE||!eglMakeCurrent(display,surface,surface,context))return false;
         eglQuerySurface(display,surface,EGL_WIDTH,&width);eglQuerySurface(display,surface,EGL_HEIGHT,&height);glViewport(0,0,width,height);
-        if(!setupGL())return false;loadTextures(manager);feet=(float)terrainHeight(0,0);inventory[0]={1,32};inventory[1]={2,16};inventory[2]={3,12};inventory[3]={4,4};inventory[4]={6,8};selected=0;running=true;updateWorld();return true;
+        if(!setupGL())return false;loadTextures(manager);feet=(float)terrainHeight(0,0);grafikFeet=(float)terrainHeight((int)grafikX,(int)grafikZ);health=10;armor=10;grafikHealth=2;inventory[0]={1,32};inventory[1]={2,16};inventory[2]={3,12};inventory[3]={4,4};inventory[4]={6,8};selected=0;running=true;updateWorld();return true;
     }
     int input(AInputEvent*e){
         if(AInputEvent_getType(e)!=AINPUT_EVENT_TYPE_MOTION)return 0;int action=AMotionEvent_getAction(e)&AMOTION_EVENT_ACTION_MASK,idx=(AMotionEvent_getAction(e)&AMOTION_EVENT_ACTION_POINTER_INDEX_MASK)>>AMOTION_EVENT_ACTION_POINTER_INDEX_SHIFT;int id=AMotionEvent_getPointerId(e,idx);float x=AMotionEvent_getX(e,idx)/width*2-1,y=1-AMotionEvent_getY(e,idx)/height*2;
@@ -403,6 +471,7 @@ public:
             else if(x>.65f&&y<-.43f){if(grounded){vy=7.4f;grounded=false;}}
             else if(x>.65f&&y>-.34f&&y<.12f){int tx,ty,tz,ax,ay,az;if(raycast(tx,ty,tz,ax,ay,az)){breaking=true;breakPointer=id;breakX=tx;breakY=ty;breakZ=tz;breakTimer=0;}}
             else if(x>.40f&&x<.66f&&y>-.54f&&y<-.25f)editBlock(true);
+            else if(x>.38f&&x<.64f&&y>-.22f&&y<.03f)attackGrafik();
             else if(y<-.72f&&x>-.31f&&x<.31f)selected=std::clamp((int)((x+.31f)/.62f*5),0,4);
             else{lookId=id;lastX=x;lastY=y;}return 1;
         }
