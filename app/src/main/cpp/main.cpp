@@ -5,6 +5,8 @@
 #include <cmath>
 #include <vector>
 #include <algorithm>
+#include <time.h>
+#include <EGL/eglext.h>
 
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, "DeathCraft", __VA_ARGS__)
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, "DeathCraft", __VA_ARGS__)
