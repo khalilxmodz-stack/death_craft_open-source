@@ -15,7 +15,7 @@
 #include <time.h>
 
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR,"DeathCraft",__VA_ARGS__)
-static constexpr int CS=16, HEIGHT=8, LOAD_RADIUS=4;
+static constexpr int CS=16, HEIGHT=32, LOAD_RADIUS=4;
 static constexpr float PI=3.14159265f;
 
 struct V3 { float x,y,z; };
@@ -37,6 +37,28 @@ static Mat4 camera(float x,float y,float z,float yaw,float pitch){
 }
 static int floorDiv(int a,int b){int q=a/b,r=a%b;return r<0?q-1:q;}
 static int modp(int a,int b){int r=a%b;return r<0?r+b:r;}
+static uint32_t terrainHash(int x,int z){
+    uint32_t h=(uint32_t)x*0x8da6b343u^(uint32_t)z*0xd8163841u;
+    h^=h>>13;h*=0x85ebca6bu;h^=h>>16;h*=0xc2b2ae35u;h^=h>>16;return h;
+}
+static float terrainNoise(float x,float z){
+    int ix=(int)std::floor(x),iz=(int)std::floor(z);float fx=x-ix,fz=z-iz;
+    fx=fx*fx*(3-2*fx);fz=fz*fz*(3-2*fz);
+    auto sample=[](int a,int b){return (terrainHash(a,b)&0x00ffffffu)/16777215.0f;};
+    float a=sample(ix,iz),b=sample(ix+1,iz),c=sample(ix,iz+1),d=sample(ix+1,iz+1);
+    return (a+(b-a)*fx)+((c+(d-c)*fx)-(a+(b-a)*fx))*fz;
+}
+static int terrainHeight(int x,int z){
+    float broad=terrainNoise(x*.018f+17,z*.018f-31);
+    float hills=terrainNoise(x*.075f-43,z*.075f+11);
+    float detail=terrainNoise(x*.16f+71,z*.16f-59);
+    float mountain=terrainNoise(x*.012f+107,z*.012f-83);
+    float peaks=terrainNoise(x*.038f-37,z*.038f+91);
+    float small=(broad-.5f)*3.4f+(hills-.5f)*3.8f+(detail-.5f)*1.2f;
+    float high=std::pow(std::max(0.0f,(mountain-.60f)/.40f),1.45f)*15.0f+
+               std::pow(std::max(0.0f,(peaks-.70f)/.30f),2.0f)*5.0f;
+    return std::clamp((int)std::lround(3.0f+small+high),1,HEIGHT-7);
+}
 static uint64_t chunkKey(int x,int z){return (uint64_t)(uint32_t)x<<32|(uint32_t)z;}
 
 struct Chunk {
@@ -93,13 +115,25 @@ class Game {
         return it->second.get(modp(x,CS),y,modp(z,CS))!=0;
     }
     void generate(Chunk&c){
-        for(int z=0;z<CS;z++)for(int x=0;x<CS;x++)c.set(x,0,z,1);
         int ox=c.cx*CS,oz=c.cz*CS;
+        for(int z=0;z<CS;z++)for(int x=0;x<CS;x++){
+            int h=terrainHeight(ox+x,oz+z);
+            for(int y=0;y<h;y++)c.set(x,y,z,y==h-1?1:(y>=h-4?2:3));
+        }
         auto put=[&](int x,int y,int z,uint8_t id){if(floorDiv(x,CS)==c.cx&&floorDiv(z,CS)==c.cz)c.set(modp(x,CS),y,modp(z,CS),id);};
         for(int z=oz-2;z<oz+CS+2;z++)for(int x=ox-2;x<ox+CS+2;x++){
-            if(modp(x+3,8)||modp(z+5,8))continue;uint32_t h=(uint32_t)x*374761393u+(uint32_t)z*668265263u;h=(h^(h>>13))*1274126177u;h^=h>>16;if(h%3==0)continue;
-            int trunk=3+(int)(h%2);for(int y=1;y<=trunk;y++)put(x,y,z,4);
-            for(int dz=-1;dz<=1;dz++)for(int dx=-1;dx<=1;dx++)for(int dy=-1;dy<=1;dy++){if(std::abs(dx)+std::abs(dz)==2&&dy==1)continue;put(x+dx,trunk+dy,z+dz,5);}put(x,trunk+1,z,5);
+            if(modp(x+3,8)||modp(z+5,8))continue;
+            uint32_t h=terrainHash(x,z);if(h%3==0)continue;
+            int ground=terrainHeight(x,z);if(ground>7)continue;
+            int trunk=3+(int)(h%2);
+            for(int y=0;y<trunk;y++)put(x,ground+y,z,4);
+            int top=ground+trunk;
+            for(int dy=-1;dy<=1;dy++)for(int dz=-1;dz<=1;dz++)for(int dx=-1;dx<=1;dx++){
+                if(std::abs(dx)==1&&std::abs(dz)==1&&dy!=1)continue;
+                if(dx==0&&dz==0&&dy<=0)continue;
+                put(x+dx,top+dy,z+dz,5);
+            }
+            put(x,top+1,z,5);
         }
         for(const auto& e:edits){
             int x=std::get<0>(e.first), y=std::get<1>(e.first), z=std::get<2>(e.first);
@@ -118,8 +152,13 @@ class Game {
         if(b==2)return{.48f,.31f,.17f};if(b==3)return{.43f,.45f,.48f};
         if(b==4)return{.43f,.27f,.12f};if(b==5)return{.12f,.48f,.13f};if(b==6)return{.67f,.46f,.24f};return{.72f,.62f,.35f};
     }
-    int breakDuration(uint8_t b)const{switch(b){case 1:return 35;case 2:return 55;case 3:return 125;case 4:return 75;case 5:return 18;case 6:return 65;default:return 45;}}
-    bool addItem(uint8_t id,int n){for(auto &i:inventory)if(i.id==id&&i.count){i.count+=n;return true;}for(auto &i:inventory)if(!i.count){i={id,n};return true;}status="Inventory full";statusFrames=90;return false;}
+    float breakDuration(uint8_t b)const{switch(b){case 1:return .65f;case 2:return .90f;case 3:return 2.10f;case 4:return 1.25f;case 5:return .30f;case 6:return 1.10f;default:return .85f;}}
+    bool addItem(uint8_t id,int n){
+        if(!id||n<=0)return true;
+        for(auto &i:inventory)if(i.id==id&&i.count>0&&i.count<64&&n>0){int add=std::min(64-i.count,n);i.count+=add;n-=add;}
+        while(n>0){auto it=std::find_if(inventory.begin(),inventory.end(),[](const Item&i){return i.count<=0;});if(it==inventory.end()){status="Inventory full";statusFrames=90;return false;}int put=std::min(64,n);*it={id,put};n-=put;}
+        return true;
+    }
     uint8_t selectedBlock()const{return inventory[selected].count?inventory[selected].id:1;}
     void consumeSelected(){if(inventory[selected].count>0&&--inventory[selected].count==0)inventory[selected].id=0;}
     void craft(int r){uint8_t src=r==0?4:6;int n=r==0?1:(r==1?2:4);for(auto&i:inventory)if(i.id==src&&n){int k=std::min(n,i.count);i.count-=k;n-=k;if(!i.count)i.id=0;}if(n){status=r==0?"Need wood":"Need planks";statusFrames=90;return;}addItem(r==0?6:(r==1?7:8),r==0?4:(r==1?4:1));}
@@ -160,6 +199,22 @@ class Game {
         line(.78f,-.65f,.78f,-.56f,.018f,{1,1,1});line(.78f,-.56f,.74f,-.60f,.018f,{1,1,1});line(.78f,-.56f,.82f,-.60f,.018f,{1,1,1});
         line(.72f,-.12f,.84f,-.02f,.018f,{1,1,1});line(.73f,-.02f,.85f,-.02f,.018f,{1,1,1});
         line(.48f,-.45f,.58f,-.45f,.014f,{1,1,1});line(.48f,-.45f,.48f,-.35f,.014f,{1,1,1});line(.58f,-.45f,.58f,-.35f,.014f,{1,1,1});line(.48f,-.35f,.58f,-.35f,.014f,{1,1,1});
+        line(-.034f,0,-.009f,0,.006f,{.015f,.015f,.02f});line(.009f,0,.034f,0,.006f,{.015f,.015f,.02f});
+        line(0,-.034f,0,-.009f,.006f,{.015f,.015f,.02f});line(0,.009f,0,.034f,.006f,{.015f,.015f,.02f});
+        line(-.032f,0,-.009f,0,.0025f,{1,1,1});line(.009f,0,.032f,0,.0025f,{1,1,1});
+        line(0,-.032f,0,-.009f,.0025f,{1,1,1});line(0,.009f,0,.032f,.0025f,{1,1,1});
+        if(breaking){
+            int tx,ty,tz,ax,ay,az;
+            if(raycast(tx,ty,tz,ax,ay,az)){
+                auto it=chunks.find(chunkKey(floorDiv(tx,CS),floorDiv(tz,CS)));
+                uint8_t block=it==chunks.end()?0:it->second.get(modp(tx,CS),ty,modp(tz,CS));
+                if(block){float progress=std::clamp(breakTimer/breakDuration(block),0.0f,1.0f);
+                    rect(-.125f,.145f,.25f,.022f,{.015f,.015f,.02f});
+                    rect(-.122f,.148f,.244f*progress,.016f,{1.0f,.72f,.16f});
+                    drawText(std::to_string((int)(progress*100))+"%",-.035f,.195f,.014f,{1,1,1});
+                }
+            }
+        }
         rect(.84f,.79f,.13f,.15f,{.01f,.01f,.015f});rect(.86f,.81f,.09f,.11f,{.2f,.2f,.22f});line(.87f,.87f,.94f,.87f,.009f,{1,1,1});line(.87f,.83f,.94f,.83f,.009f,{1,1,1});
         for(int i=0;i<5;i++){float x=-.28f+i*.115f;rect(x,-.92f,.105f,.16f,i==selected?V3{1,.78f,.18f}:V3{.01f,.01f,.015f});rect(x+.008f,-.912f,.089f,.144f,{.2f,.2f,.22f});if(inventory[i].count){rect(x+.025f,-.88f,.055f,.075f,blockColor(inventory[i].id,2));drawText(std::to_string(inventory[i].count),x+.060f,-.89f,.010f,{1,1,1});}}
         draw(v,GL_TRIANGLES,m,0,0,0,false);if(statusFrames>0){drawText(status,-.85f,.72f,.018f,{1,1,1});statusFrames--;}glEnable(GL_DEPTH_TEST);
@@ -188,7 +243,7 @@ class Game {
         case '4':return {2,6,10,18,31,2,2};case '5':return {31,16,16,30,1,1,30};
         case '6':return {14,16,16,30,17,17,14};case '7':return {31,1,2,4,8,8,8};
         case '8':return {14,17,17,14,17,17,14};case '9':return {14,17,17,15,1,1,14};
-        case ':':return {0,4,4,0,4,4,0};case '-':return {0,0,0,31,0,0,0};
+        case ':':return {0,4,4,0,4,4,0};case '-':return {0,0,0,31,0,0,0};case '%':return {17,2,4,8,17,0,0};
         default:return {0,0,0,0,0,0,0};
         }
     }
@@ -209,8 +264,13 @@ class Game {
         return false;
     }
     void movePlayer(float dx,float dz){
-        float nx=px+dx;if(!overlaps(nx,feet,pz))px=nx;
-        float nz=pz+dz;if(!overlaps(px,feet,nz))pz=nz;
+        float distance=std::max(std::abs(dx),std::abs(dz));
+        int steps=std::max(1,(int)std::ceil(distance/.18f));
+        float sx=dx/steps,sz=dz/steps;
+        for(int i=0;i<steps;i++){
+            float nx=px+sx;if(!overlaps(nx,feet,pz))px=nx;
+            float nz=pz+sz;if(!overlaps(px,feet,nz))pz=nz;
+        }
     }
     bool raycast(int&hx,int&hy,int&hz,int&px0,int&py0,int&pz0){
         V3 d{std::sin(yaw)*std::cos(pitch),std::sin(pitch),-std::cos(yaw)*std::cos(pitch)};
@@ -257,7 +317,7 @@ class Game {
             feet=next;if(feet< -20){feet=5;vy=0;}}
         // Keep the feet on the surface of the generated grass layer.
         if(grounded&&feet<1.001f)feet=1.0f;
-        if(breaking){int tx,ty,tz,ax,ay,az;if(raycast(tx,ty,tz,ax,ay,az)){if(tx!=breakX||ty!=breakY||tz!=breakZ){breakX=tx;breakY=ty;breakZ=tz;breakTimer=0;}auto it=chunks.find(chunkKey(floorDiv(tx,CS),floorDiv(tz,CS)));uint8_t q=it==chunks.end()?0:it->second.get(modp(tx,CS),ty,modp(tz,CS));breakTimer+=dt;if(q&&breakTimer>=breakDuration(q)/60.0f){editBlock(false);breaking=false;breakTimer=0;}}else breakTimer=0;}
+        if(breaking){int tx,ty,tz,ax,ay,az;if(raycast(tx,ty,tz,ax,ay,az)){if(tx!=breakX||ty!=breakY||tz!=breakZ){breakX=tx;breakY=ty;breakZ=tz;breakTimer=0;}auto it=chunks.find(chunkKey(floorDiv(tx,CS),floorDiv(tz,CS)));uint8_t q=it==chunks.end()?0:it->second.get(modp(tx,CS),ty,modp(tz,CS));breakTimer+=dt;if(q&&breakTimer>=breakDuration(q)){editBlock(false);breaking=false;breakTimer=0;}}else breakTimer=0;}
         updateWorld();
         glViewport(0,0,width,height);glClearColor(.48f,.74f,.96f,1);glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
         Mat4 vp=mul(perspective(1.02f,(float)width/height,.1f,180),camera(px,feet+1.62f,pz,yaw,pitch));
@@ -282,7 +342,7 @@ public:
         const EGLint ca[]={EGL_CONTEXT_CLIENT_VERSION,3,EGL_NONE};context=eglCreateContext(display,cfg,EGL_NO_CONTEXT,ca);surface=eglCreateWindowSurface(display,cfg,w,nullptr);
         if(context==EGL_NO_CONTEXT||surface==EGL_NO_SURFACE||!eglMakeCurrent(display,surface,surface,context))return false;
         eglQuerySurface(display,surface,EGL_WIDTH,&width);eglQuerySurface(display,surface,EGL_HEIGHT,&height);glViewport(0,0,width,height);
-        if(!setupGL())return false;inventory[0]={1,32};inventory[1]={2,16};inventory[2]={3,12};inventory[3]={4,4};inventory[4]={6,8};selected=0;running=true;updateWorld();return true;
+        if(!setupGL())return false;feet=(float)terrainHeight(0,0);inventory[0]={1,32};inventory[1]={2,16};inventory[2]={3,12};inventory[3]={4,4};inventory[4]={6,8};selected=0;running=true;updateWorld();return true;
     }
     int input(AInputEvent*e){
         if(AInputEvent_getType(e)!=AINPUT_EVENT_TYPE_MOTION)return 0;int action=AMotionEvent_getAction(e)&AMOTION_EVENT_ACTION_MASK,idx=(AMotionEvent_getAction(e)&AMOTION_EVENT_ACTION_POINTER_INDEX_MASK)>>AMOTION_EVENT_ACTION_POINTER_INDEX_SHIFT;int id=AMotionEvent_getPointerId(e,idx);float x=AMotionEvent_getX(e,idx)/width*2-1,y=1-AMotionEvent_getY(e,idx)/height*2;
