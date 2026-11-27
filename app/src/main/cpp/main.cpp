@@ -77,7 +77,7 @@ class Game {
         GLint ok=0;glGetProgramiv(program,GL_LINK_STATUS,&ok);if(!ok)return false;
         mvpLoc=glGetUniformLocation(program,"mvp");
         glGenVertexArrays(1,&vao);glGenBuffers(1,&vbo);
-        glEnable(GL_DEPTH_TEST);glEnable(GL_CULL_FACE);glCullFace(GL_BACK);return true;
+        glEnable(GL_DEPTH_TEST);glDisable(GL_CULL_FACE);return true;
     }
     void addTri(std::vector<float>&v,V3 a,V3 b,V3 c,V3 color){
         for(V3 p:{a,b,c})v.insert(v.end(),{p.x,p.y,p.z,color.x,color.y,color.z});
@@ -147,7 +147,7 @@ class Game {
         // Crosshair
         rect(-.018f,-.008f,.036f,.016f,{1,1,1});rect(-.006f,-.025f,.012f,.05f,{1,1,1});
         draw(v,GL_TRIANGLES,ortho);
-        glEnable(GL_CULL_FACE);glEnable(GL_DEPTH_TEST);
+        glDisable(GL_CULL_FACE);glEnable(GL_DEPTH_TEST);
     }
     bool overlaps(float x,float y,float z){
         const float radius=.30f;
@@ -207,7 +207,7 @@ class Game {
             V3 p[8]={{X,Y,Z},{X+1,Y,Z},{X+1,Y+1,Z},{X,Y+1,Z},{X,Y,Z+1},{X+1,Y,Z+1},{X+1,Y+1,Z+1},{X,Y+1,Z+1}};
             int e[24]={0,1,1,2,2,3,3,0,4,5,5,6,6,7,7,4,0,4,1,5,2,6,3,7};
             for(int i=0;i<24;i+=2){for(int j:{e[i],e[i+1]})edge.insert(edge.end(),{p[j].x,p[j].y,p[j].z,white.x,white.y,white.z});}
-            glDisable(GL_CULL_FACE);draw(edge,GL_LINES,vp);glEnable(GL_CULL_FACE);
+            glDisable(GL_CULL_FACE);draw(edge,GL_LINES,vp);
         }
         drawHud();eglSwapBuffers(display,surface);
     }
