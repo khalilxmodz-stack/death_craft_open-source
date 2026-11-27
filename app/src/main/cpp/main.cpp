@@ -14,6 +14,12 @@
 #include <tuple>
 #include <time.h>
 #include <android/asset_manager.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <cstring>
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 
@@ -73,6 +79,8 @@ struct Chunk {
     void set(int x,int y,int z,uint8_t b){if(x>=0&&x<CS&&z>=0&&z<CS&&y>=0&&y<HEIGHT){blocks[(y*CS+z)*CS+x]=b;dirty=true;}}
 };
 
+struct LanPacket { uint32_t magic=0x44434654u; uint8_t type=0; uint32_t player=0; float x=0,y=0,z=0,yaw=0; int32_t bx=0,by=0,bz=0; uint8_t block=0; };
+
 class Game {
     EGLDisplay display=EGL_NO_DISPLAY; EGLSurface surface=EGL_NO_SURFACE; EGLContext context=EGL_NO_CONTEXT;
     GLuint program=0,vao=0,vbo=0,atlasTexture=0; GLint mvpLoc=-1,cameraLoc=-1,fogLoc=-1,textureLoc=-1,atlasLoc=-1;
@@ -92,6 +100,47 @@ class Game {
     struct Item{uint8_t id=0;int count=0;};std::array<Item,20> inventory{};
     std::string status="DEATH_CRAFT  |  V0.1";
     int statusFrames=0;
+    int lanSocket=-1,lanMode=0;
+    uint32_t networkId=0;
+    float lanTimer=0,helloTimer=0,remoteTimer=0;
+    bool remoteValid=false;
+    float remoteX=0,remoteY=0,remoteZ=0,remoteYaw=0;
+    sockaddr_in lanBroadcast{};
+
+    void setLanMode(int mode){
+        if(lanSocket<0){
+            lanSocket=socket(AF_INET,SOCK_DGRAM,0);
+            if(lanSocket<0){status="LAN SOCKET ERROR";statusFrames=120;return;}
+            int yes=1;setsockopt(lanSocket,SOL_SOCKET,SO_REUSEADDR,&yes,sizeof(yes));
+#ifdef SO_REUSEPORT
+            setsockopt(lanSocket,SOL_SOCKET,SO_REUSEPORT,&yes,sizeof(yes));
+#endif
+            setsockopt(lanSocket,SOL_SOCKET,SO_BROADCAST,&yes,sizeof(yes));
+            sockaddr_in local{};local.sin_family=AF_INET;local.sin_port=htons(27015);local.sin_addr.s_addr=htonl(INADDR_ANY);
+            if(bind(lanSocket,(sockaddr*)&local,sizeof(local))<0){close(lanSocket);lanSocket=-1;status="LAN PORT BUSY";statusFrames=120;return;}
+            fcntl(lanSocket,F_SETFL,fcntl(lanSocket,F_GETFL,0)|O_NONBLOCK);
+            networkId=(uint32_t)getpid()^(uint32_t)time(nullptr);if(!networkId)networkId=1;
+            lanBroadcast.sin_family=AF_INET;lanBroadcast.sin_port=htons(27015);lanBroadcast.sin_addr.s_addr=htonl(INADDR_BROADCAST);
+        }
+        lanMode=mode;remoteValid=false;remoteTimer=0;lanTimer=0;helloTimer=0;
+        status=mode==1?"LAN HOSTING - WAITING":"LAN SEARCHING FOR HOST";statusFrames=180;
+    }
+    void sendLan(const LanPacket&p){if(lanSocket>=0)sendto(lanSocket,&p,sizeof(p),0,(sockaddr*)&lanBroadcast,sizeof(lanBroadcast));}
+    void updateLan(float dt){
+        if(lanSocket<0||lanMode==0)return;
+        LanPacket p{};sockaddr_in from{};socklen_t fromLen=sizeof(from);
+        while(recvfrom(lanSocket,&p,sizeof(p),0,(sockaddr*)&from,&fromLen)==sizeof(p)){
+            if(p.magic!=0x44434654u||p.player==networkId)continue;
+            if(p.type==1&&lanMode==1){LanPacket reply{};reply.type=2;reply.player=networkId;reply.x=px;reply.y=feet;reply.z=pz;reply.yaw=yaw;sendLan(reply);}
+            else if(p.type==2){remoteValid=true;remoteTimer=0;remoteX=p.x;remoteY=p.y;remoteZ=p.z;remoteYaw=p.yaw;}
+            else if(p.type==3){int cx=floorDiv(p.bx,CS),cz=floorDiv(p.bz,CS);Chunk&c=ensureChunk(cx,cz);c.set(modp(p.bx,CS),p.by,modp(p.bz,CS),p.block);edits[{p.bx,p.by,p.bz}]=p.block;for(auto&entry:chunks)entry.second.dirty=true;}
+            fromLen=sizeof(from);
+        }
+        lanTimer+=dt;helloTimer+=dt;remoteTimer+=dt;
+        if(lanTimer>=.10f){lanTimer=0;LanPacket state{};state.type=2;state.player=networkId;state.x=px;state.y=feet;state.z=pz;state.yaw=yaw;sendLan(state);}
+        if(lanMode==2&&helloTimer>=.50f){helloTimer=0;LanPacket hello{};hello.type=1;hello.player=networkId;sendLan(hello);}
+        if(remoteTimer>3.0f)remoteValid=false;
+    }
 
     GLuint makeShader(GLenum type,const char*src){GLuint s=glCreateShader(type);glShaderSource(s,1,&src,nullptr);glCompileShader(s);GLint ok=0;glGetShaderiv(s,GL_COMPILE_STATUS,&ok);if(!ok){char log[1024];glGetShaderInfoLog(s,1024,nullptr,log);LOGE("Shader: %s",log);}return s;}
     bool setupGL(){
@@ -216,7 +265,7 @@ class Game {
         return true;
     }
     uint8_t selectedBlock()const{return inventory[selected].count?inventory[selected].id:1;}
-    void consumeSelected(){if(inventory[selected].count>0&&--inventory[selected].count==0)inventory[selected].id=0;}
+    void consumeSelected(){}
     void craft(int r){uint8_t src=r==0?4:6;int n=r==0?1:(r==1?2:4);for(auto&i:inventory)if(i.id==src&&n){int k=std::min(n,i.count);i.count-=k;n-=k;if(!i.count)i.id=0;}if(n){status=r==0?"Need wood":"Need planks";statusFrames=90;return;}addItem(r==0?6:(r==1?7:8),r==0?4:(r==1?4:1));}
     int inventorySlotAt(float x,float y)const{for(int r=0;r<4;r++)for(int c=0;c<5;c++){float bx=-.58f+c*.235f,by=.30f-r*.245f;if(x>=bx&&x<=bx+.19f&&y>=by-.19f&&y<=by+.02f)return r*5+c;}return -1;}
     void rebuild(Chunk&c){
@@ -250,6 +299,9 @@ class Game {
         auto rect=[&](float x,float y,float w,float h,V3 c){t(x,y,x+w,y,x+w,y+h,c);t(x,y,x+w,y+h,x,y+h,c);};
         auto circ=[&](float x,float y,float r,V3 c){for(int i=0;i<32;i++){float a=i*2*PI/32,b=(i+1)*2*PI/32;t(x,y,x+cosf(a)*r,y+sinf(a)*r,x+cosf(b)*r,y+sinf(b)*r,c);}};
         auto line=[&](float x,float y,float X,float Y,float q,V3 c){float dx=X-x,dy=Y-y,l=sqrtf(dx*dx+dy*dy);if(l<.001f)return;float ox=-dy/l*q,oy=dx/l*q;t(x+ox,y+oy,X+ox,Y+oy,X-ox,Y-oy,c);t(x+ox,y+oy,X-ox,Y-oy,x-ox,y-oy,c);};
+        rect(-.94f,.57f,.20f,.12f,lanMode==1?V3{.12f,.55f,.20f}:V3{.04f,.04f,.05f});
+        rect(-.70f,.57f,.20f,.12f,lanMode==2?V3{.12f,.35f,.65f}:V3{.04f,.04f,.05f});
+        drawText("HOST",-.91f,.61f,.012f,{1,1,1});drawText("JOIN",-.67f,.61f,.012f,{1,1,1});
         circ(joyOriginX,joyOriginY,.255f,{.01f,.01f,.015f});circ(joyOriginX,joyOriginY,.22f,{.14f,.14f,.16f});circ(joyOriginX+joyX*.16f,joyOriginY+joyY*.16f,.105f,{.01f,.01f,.015f});
         circ(.78f,-.62f,.14f,{.01f,.01f,.015f});circ(.78f,-.62f,.115f,{.17f,.17f,.19f});
         circ(.78f,-.10f,.14f,{.01f,.01f,.015f});circ(.78f,-.10f,.115f,{.17f,.17f,.19f});
@@ -282,7 +334,7 @@ class Game {
             t(sx-.026f,sy+.025f,sx+.026f,sy+.025f,sx,sy-.042f,sc);t(sx-.026f,sy+.025f,sx,sy-.042f,sx-.022f,sy-.005f,sc);t(sx+.026f,sy+.025f,sx+.022f,sy-.005f,sx,sy-.042f,sc);
         }
         rect(.84f,.79f,.13f,.15f,{.01f,.01f,.015f});rect(.86f,.81f,.09f,.11f,{.2f,.2f,.22f});line(.87f,.87f,.94f,.87f,.009f,{1,1,1});line(.87f,.83f,.94f,.83f,.009f,{1,1,1});
-        for(int i=0;i<5;i++){float x=-.28f+i*.115f;rect(x,-.92f,.105f,.16f,i==selected?V3{1,.78f,.18f}:V3{.01f,.01f,.015f});rect(x+.008f,-.912f,.089f,.144f,{.2f,.2f,.22f});if(inventory[i].count){rect(x+.025f,-.88f,.055f,.075f,blockColor(inventory[i].id,2));drawText(std::to_string(inventory[i].count),x+.060f,-.89f,.010f,{1,1,1});}}
+        for(int i=0;i<5;i++){float x=-.28f+i*.115f;rect(x,-.92f,.105f,.16f,i==selected?V3{1,.78f,.18f}:V3{.01f,.01f,.015f});rect(x+.008f,-.912f,.089f,.144f,{.2f,.2f,.22f});if(inventory[i].count){rect(x+.025f,-.88f,.055f,.075f,blockColor(inventory[i].id,2));drawText(inventory[i].count>=999999?"INF":std::to_string(inventory[i].count),x+.060f,-.89f,.010f,{1,1,1});}}
         draw(v,GL_TRIANGLES,m,0,0,0,false);if(statusFrames>0){drawText(status,-.85f,.66f,.018f,{1,1,1});statusFrames--;}
         if(playerDead){float k=std::clamp(swallowTimer/2.8f,0.0f,1.0f);std::vector<float> overlay;addFace(overlay,{-1,-1,0},{1,-1,0},{1,1,0},{-1,1,0},{.015f+.035f*k,.005f,.018f+.025f*k});draw(overlay,GL_TRIANGLES,identity(),0,0,0,false);std::vector<float>mouth;for(int i=0;i<48;i++){float a=i*2*PI/48,b=(i+1)*2*PI/48;addTri(mouth,{0,0,0},{std::cos(a)*(.10f+.70f*k),std::sin(a)*(.10f+.70f*k),0},{std::cos(b)*(.10f+.70f*k),std::sin(b)*(.10f+.70f*k),0},{.005f,.002f,.008f});}draw(mouth,GL_TRIANGLES,identity(),0,0,0,false);drawText("GRAFIK ATE YOU",-.52f,-.72f,.035f,{1,.25f,.30f});}
         glEnable(GL_DEPTH_TEST);
@@ -290,7 +342,7 @@ class Game {
     void drawInventory(){
         glDisable(GL_DEPTH_TEST);std::vector<float>v;auto r=[&](float x,float y,float w,float h,V3 c){addFace(v,{x,y,0},{x+w,y,0},{x+w,y+h,0},{x,y+h,0},c);};
         r(-.78f,-.73f,1.56f,1.43f,{.03f,.03f,.04f});r(-.75f,-.70f,1.50f,1.37f,{.13f,.14f,.16f});
-        for(int i=0;i<20;i++){int row=i/5,col=i%5;float x=-.58f+col*.235f,y=.30f-row*.245f;r(x,y-.19f,.19f,.21f,i==selected?V3{.72f,.52f,.14f}:V3{.025f,.025f,.03f});r(x+.008f,y-.182f,.174f,.194f,{.24f,.24f,.26f});if(inventory[i].count){r(x+.055f,y-.135f,.075f,.09f,blockColor(inventory[i].id,2));drawText(std::to_string(inventory[i].count),x+.125f,y-.17f,.012f,{1,1,1});}}
+        for(int i=0;i<20;i++){int row=i/5,col=i%5;float x=-.58f+col*.235f,y=.30f-row*.245f;r(x,y-.19f,.19f,.21f,i==selected?V3{.72f,.52f,.14f}:V3{.025f,.025f,.03f});r(x+.008f,y-.182f,.174f,.194f,{.24f,.24f,.26f});if(inventory[i].count){r(x+.055f,y-.135f,.075f,.09f,blockColor(inventory[i].id,2));drawText(inventory[i].count>=999999?"INF":std::to_string(inventory[i].count),x+.125f,y-.17f,.012f,{1,1,1});}}
         r(.60f,.27f,.15f,.15f,{.02f,.02f,.025f});r(.60f,-.02f,.15f,.15f,{.02f,.02f,.025f});r(.60f,-.31f,.15f,.15f,{.02f,.02f,.025f});draw(v,GL_TRIANGLES,identity(),0,0,0,false);
         drawText("INVENTORY",-.25f,.62f,.025f,{1,.85f,.35f});drawText("DRAG ITEMS",-.43f,-.66f,.016f,{1,1,1});drawText("PLANKS",.57f,.48f,.015f,{1,1,1});drawText("STICKS",.58f,.19f,.015f,{1,1,1});drawText("TABLE",.59f,-.10f,.015f,{1,1,1});drawText("X",.66f,.62f,.025f,{1,1,1});glEnable(GL_DEPTH_TEST);
     }
@@ -375,10 +427,12 @@ class Game {
             if(!inventory[selected].count){status="Select a block";statusFrames=90;return;}uint8_t item=selectedBlock();if(ay<0||ay>=HEIGHT)return;
             if(overlaps(ax+.5f,ay,az+.5f)){status="Cannot place inside player";statusFrames=90;return;}
             int cx=floorDiv(ax,CS),cz=floorDiv(az,CS);Chunk&c=ensureChunk(cx,cz);c.set(modp(ax,CS),ay,modp(az,CS),item);edits[{ax,ay,az}]=item;consumeSelected();
+            if(lanMode){LanPacket packet{};packet.type=3;packet.player=networkId;packet.bx=ax;packet.by=ay;packet.bz=az;packet.block=item;sendLan(packet);}
         }else{
             uint8_t broken=0;auto it=chunks.find(chunkKey(floorDiv(x,CS),floorDiv(z,CS)));if(it!=chunks.end())broken=it->second.get(modp(x,CS),y,modp(z,CS));
             int cx=floorDiv(x,CS),cz=floorDiv(z,CS);Chunk&c=ensureChunk(cx,cz);c.set(modp(x,CS),y,modp(z,CS),0);edits[{x,y,z}]=0;
             if(broken==4)addItem(4,1);else if(broken==5)addItem(5,1);else if(broken==3)addItem(3,1);else if(broken==1||broken==2)addItem(2,1);else if(broken==6)addItem(6,1);
+            if(lanMode){LanPacket packet{};packet.type=3;packet.player=networkId;packet.bx=x;packet.by=y;packet.bz=z;packet.block=0;sendLan(packet);}
         }
         // Adjacent chunks may expose a newly visible border face.
         for(auto&entry:chunks)entry.second.dirty=true;
@@ -431,10 +485,16 @@ class Game {
         if(breaking){int tx,ty,tz,ax,ay,az;if(raycast(tx,ty,tz,ax,ay,az)){if(tx!=breakX||ty!=breakY||tz!=breakZ){breakX=tx;breakY=ty;breakZ=tz;breakTimer=0;}auto it=chunks.find(chunkKey(floorDiv(tx,CS),floorDiv(tz,CS)));uint8_t q=it==chunks.end()?0:it->second.get(modp(tx,CS),ty,modp(tz,CS));breakTimer+=dt;if(q&&breakTimer>=breakDuration(q)){editBlock(false);breaking=false;breakTimer=0;}}else breakTimer=0;}
         }
         updateGrafik(dt);
+        updateLan(dt);
         updateWorld();
         glViewport(0,0,width,height);glClearColor(.48f,.74f,.96f,1);glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
         Mat4 vp=mul(perspective(1.02f,(float)width/height,.1f,180),camera(px,feet+1.62f,pz,yaw,pitch));
         for(auto&entry:chunks)draw(entry.second.mesh,GL_TRIANGLES,vp,px,feet+1.62f,pz,true,true);
+        if(remoteValid){
+            std::vector<float> remoteSphere;auto rp=[&](float lat,float lon){return V3{remoteX+.42f*std::cos(lat)*std::sin(lon),remoteY+.72f+.42f*std::sin(lat),remoteZ+.42f*std::cos(lat)*std::cos(lon)};};
+            for(int iy=0;iy<8;iy++){float a0=-PI*.5f+PI*iy/8.0f,a1=-PI*.5f+PI*(iy+1)/8.0f;for(int ix=0;ix<12;ix++){float b0=2*PI*ix/12.0f,b1=2*PI*(ix+1)/12.0f;V3 p0=rp(a0,b0),p1=rp(a0,b1),p2=rp(a1,b1),p3=rp(a1,b0);V3 c{.12f,.48f,.95f};addTri(remoteSphere,p0,p1,p2,c);addTri(remoteSphere,p0,p2,p3,c);}}
+            draw(remoteSphere,GL_TRIANGLES,vp,px,feet+1.62f,pz,true,false);
+        }
         if(grafikAlive){
             std::vector<float> sphere;auto point=[&](float lat,float lon){return V3{grafikX+.58f*std::cos(lat)*std::sin(lon),grafikFeet+.62f+.58f*std::sin(lat),grafikZ+.58f*std::cos(lat)*std::cos(lon)};};
             for(int iy=0;iy<10;iy++){float a0=-PI*.5f+PI*iy/10.0f,a1=-PI*.5f+PI*(iy+1)/10.0f;for(int ix=0;ix<16;ix++){float b0=2*PI*ix/16.0f,b1=2*PI*(ix+1)/16.0f;V3 p0=point(a0,b0),p1=point(a0,b1),p2=point(a1,b1),p3=point(a1,b0);float shade=.72f+.28f*std::max(0.0f,std::sin((a0+a1)*.5f));V3 c{.48f*shade,.12f*shade,.68f*shade};addTri(sphere,p0,p1,p2,c);addTri(sphere,p0,p2,p3,c);}}
@@ -460,12 +520,14 @@ public:
         const EGLint ca[]={EGL_CONTEXT_CLIENT_VERSION,3,EGL_NONE};context=eglCreateContext(display,cfg,EGL_NO_CONTEXT,ca);surface=eglCreateWindowSurface(display,cfg,w,nullptr);
         if(context==EGL_NO_CONTEXT||surface==EGL_NO_SURFACE||!eglMakeCurrent(display,surface,surface,context))return false;
         eglQuerySurface(display,surface,EGL_WIDTH,&width);eglQuerySurface(display,surface,EGL_HEIGHT,&height);glViewport(0,0,width,height);
-        if(!setupGL())return false;loadTextures(manager);feet=(float)terrainHeight(0,0);grafikFeet=(float)terrainHeight((int)grafikX,(int)grafikZ);health=10;armor=10;grafikHealth=2;inventory[0]={1,32};inventory[1]={2,16};inventory[2]={3,12};inventory[3]={4,4};inventory[4]={6,8};selected=0;running=true;updateWorld();return true;
+        if(!setupGL())return false;loadTextures(manager);feet=(float)terrainHeight(0,0);grafikFeet=(float)terrainHeight((int)grafikX,(int)grafikZ);health=10;armor=10;grafikHealth=2;inventory[0]={1,999999};inventory[1]={2,999999};inventory[2]={3,999999};inventory[3]={4,999999};inventory[4]={5,999999};inventory[5]={6,999999};inventory[6]={7,999999};inventory[7]={8,999999};selected=0;running=true;updateWorld();return true;
     }
     int input(AInputEvent*e){
         if(AInputEvent_getType(e)!=AINPUT_EVENT_TYPE_MOTION)return 0;int action=AMotionEvent_getAction(e)&AMOTION_EVENT_ACTION_MASK,idx=(AMotionEvent_getAction(e)&AMOTION_EVENT_ACTION_POINTER_INDEX_MASK)>>AMOTION_EVENT_ACTION_POINTER_INDEX_SHIFT;int id=AMotionEvent_getPointerId(e,idx);float x=AMotionEvent_getX(e,idx)/width*2-1,y=1-AMotionEvent_getY(e,idx)/height*2;
         if(action==AMOTION_EVENT_ACTION_DOWN||action==AMOTION_EVENT_ACTION_POINTER_DOWN){
             if(inventoryOpen){if(x>.62f&&y>.55f){inventoryOpen=false;dragIndex=-1;return 1;}if(x>.55f&&x<.80f&&y>.20f&&y<.43f){craft(0);return 1;}if(x>.55f&&x<.80f&&y>-.08f&&y<.16f){craft(1);return 1;}if(x>.55f&&x<.80f&&y>-.38f&&y<-.12f){craft(2);return 1;}int slot=inventorySlotAt(x,y);if(slot>=0){dragIndex=slot;dragPointer=id;}return 1;}
+            if(x>-.95f&&x<-.72f&&y>.55f&&y<.73f){setLanMode(1);return 1;}
+            if(x>-.72f&&x<-.47f&&y>.55f&&y<.73f){setLanMode(2);return 1;}
             if(x>.81f&&y>.72f){inventoryOpen=true;joyId=lookId=-1;joyX=joyY=0;breaking=false;return 1;}
             if(x<-.42f&&y<0){joyId=id;joyOriginX=x;joyOriginY=y;setJoy(x,y);}
             else if(x>.65f&&y<-.43f){if(grounded){vy=7.4f;grounded=false;}}
@@ -478,7 +540,7 @@ public:
         if(action==AMOTION_EVENT_ACTION_MOVE){for(size_t n=0;n<AMotionEvent_getPointerCount(e);n++){int pid=AMotionEvent_getPointerId(e,n);float tx=AMotionEvent_getX(e,n)/width*2-1,ty=1-AMotionEvent_getY(e,n)/height*2;if(pid==joyId)setJoy(tx,ty);if(pid==lookId){yaw+=(tx-lastX)*1.45f;pitch=std::clamp(pitch-(ty-lastY)*1.15f,-1.35f,1.35f);lastX=tx;lastY=ty;}}return 1;}
         if(action==AMOTION_EVENT_ACTION_UP||action==AMOTION_EVENT_ACTION_POINTER_UP||action==AMOTION_EVENT_ACTION_CANCEL){if(action==AMOTION_EVENT_ACTION_CANCEL){joyId=lookId=breakPointer=dragPointer=-1;joyX=joyY=0;breaking=false;dragIndex=-1;return 1;}if(id==joyId){joyId=-1;joyX=joyY=0;}if(id==lookId)lookId=-1;if(id==breakPointer){breakPointer=-1;breaking=false;breakTimer=0;}if(inventoryOpen&&id==dragPointer&&dragIndex>=0){int target=inventorySlotAt(x,y);if(target>=0&&target!=dragIndex)std::swap(inventory[target],inventory[dragIndex]);dragIndex=dragPointer=-1;}return 1;}return 1;
     }
-    void shutdown(){running=false;if(display!=EGL_NO_DISPLAY){eglMakeCurrent(display,EGL_NO_SURFACE,EGL_NO_SURFACE,EGL_NO_CONTEXT);if(context!=EGL_NO_CONTEXT)eglDestroyContext(display,context);if(surface!=EGL_NO_SURFACE)eglDestroySurface(display,surface);eglTerminate(display);}display=EGL_NO_DISPLAY;surface=EGL_NO_SURFACE;context=EGL_NO_CONTEXT;}
+    void shutdown(){running=false;if(lanSocket>=0){close(lanSocket);lanSocket=-1;}lanMode=0;remoteValid=false;if(display!=EGL_NO_DISPLAY){eglMakeCurrent(display,EGL_NO_SURFACE,EGL_NO_SURFACE,EGL_NO_CONTEXT);if(context!=EGL_NO_CONTEXT)eglDestroyContext(display,context);if(surface!=EGL_NO_SURFACE)eglDestroySurface(display,surface);eglTerminate(display);}display=EGL_NO_DISPLAY;surface=EGL_NO_SURFACE;context=EGL_NO_CONTEXT;}
     void tick(float dt){frame(dt);}
     bool isRunning() const { return running; }
 };
