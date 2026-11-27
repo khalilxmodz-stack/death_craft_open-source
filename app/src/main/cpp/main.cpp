@@ -11,6 +11,7 @@
 #include <cstdint>
 #include <string>
 #include <initializer_list>
+#include <tuple>
 #include <time.h>
 
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR,"DeathCraft",__VA_ARGS__)
@@ -52,6 +53,7 @@ class Game {
     GLuint program=0,vao=0,vbo=0; GLint mvpLoc=-1;
     int width=1,height=1;
     std::map<uint64_t,Chunk> chunks;
+    std::map<std::tuple<int,int,int>,uint8_t> edits;
     float px=0,feet=1.0f,pz=0,yaw=0,pitch=0,vy=0;
     bool grounded=false,running=false;
     float joyX=0,joyY=0,lastX=0,lastY=0;
@@ -93,6 +95,11 @@ class Game {
     void generate(Chunk&c){
         for(int z=0;z<CS;z++)for(int x=0;x<CS;x++){
             c.set(x,0,z,1);
+        }
+        for(const auto& e:edits){
+            int x=std::get<0>(e.first), y=std::get<1>(e.first), z=std::get<2>(e.first);
+            if(floorDiv(x,CS)==c.cx && floorDiv(z,CS)==c.cz)
+                c.set(modp(x,CS),y,modp(z,CS),e.second);
         }
         c.dirty=true;
     }
@@ -140,6 +147,21 @@ class Game {
         circle(.78f,-.62f,.105f,{.94f,.77f,.20f});
         circle(.58f,-.30f,.075f,{.20f,.72f,.90f});
         circle(.82f,.02f,.075f,{.85f,.35f,.20f});
+        auto line=[&](float x1,float y1,float x2,float y2,float t,V3 col){
+            float dx=x2-x1,dy=y2-y1,len=std::sqrt(dx*dx+dy*dy);if(len<.0001f)return;
+            float ox=-dy/len*t,oy=dx/len*t;
+            tri(x1+ox,y1+oy,x2+ox,y2+oy,x2-ox,y2-oy,col);
+            tri(x1+ox,y1+oy,x2-ox,y2-oy,x1-ox,y1-oy,col);
+        };
+        line(.78f,-.66f,.78f,-.57f,.012f,{.12f,.13f,.10f});
+        line(.78f,-.57f,.75f,-.60f,.012f,{.12f,.13f,.10f});
+        line(.78f,-.57f,.81f,-.60f,.012f,{.12f,.13f,.10f});
+        line(.54f,-.31f,.62f,-.31f,.009f,{1,1,1});
+        line(.54f,-.31f,.58f,-.26f,.009f,{1,1,1});
+        line(.58f,-.26f,.62f,-.31f,.009f,{1,1,1});
+        line(.79f,.02f,.85f,.08f,.012f,{1,1,1});
+        line(.85f,.08f,.88f,.02f,.012f,{1,1,1});
+        line(.79f,.02f,.88f,.02f,.012f,{1,1,1});
         // Five selectable hotbar slots.
         float start=-.24f,slot=.105f;
         for(int i=0;i<5;i++){V3 c=i==selected?V3{1,.82f,.25f}:V3{.18f,.22f,.20f};rect(start+i*.11f,-.91f,slot,.15f,c);
@@ -172,9 +194,17 @@ class Game {
     }
     void editBlock(bool place){
         int x,y,z,ax,ay,az;if(!raycast(x,y,z,ax,ay,az)){status="No block in reach";statusFrames=90;return;}
-        if(place){if(overlaps(ax+.5f,ay,az+.5f)){status="Cannot place inside player";statusFrames=90;return;}
-            int cx=floorDiv(ax,CS),cz=floorDiv(az,CS);Chunk&c=ensureChunk(cx,cz);c.set(modp(ax,CS),ay,modp(az,CS),hotbar[selected]);}
-        else {int cx=floorDiv(x,CS),cz=floorDiv(z,CS);Chunk&c=ensureChunk(cx,cz);c.set(modp(x,CS),y,modp(z,CS),0);}
+        if(place){
+            if(ay<0||ay>=HEIGHT){status="Build height limit";statusFrames=90;return;}
+            if(overlaps(ax+.5f,ay,az+.5f)){status="Cannot place inside player";statusFrames=90;return;}
+            int cx=floorDiv(ax,CS),cz=floorDiv(az,CS);
+            Chunk&c=ensureChunk(cx,cz);c.set(modp(ax,CS),ay,modp(az,CS),hotbar[selected]);
+            edits[{ax,ay,az}]=hotbar[selected];
+        } else {
+            int cx=floorDiv(x,CS),cz=floorDiv(z,CS);
+            Chunk&c=ensureChunk(cx,cz);c.set(modp(x,CS),y,modp(z,CS),0);
+            edits[{x,y,z}]=0;
+        }
         // Adjacent chunks may expose a newly visible border face.
         for(auto&entry:chunks)entry.second.dirty=true;
         status=place?"Block placed":"Block broken";statusFrames=60;
@@ -192,7 +222,11 @@ class Game {
         float forward=-joyY,side=joyX,mag=std::sqrt(forward*forward+side*side);if(mag>1){forward/=mag;side/=mag;}
         float speed=5.2f;movePlayer((std::sin(yaw)*forward+std::cos(yaw)*side)*speed*dt,(-std::cos(yaw)*forward+std::sin(yaw)*side)*speed*dt);
         if(!grounded){vy-=22*dt;float next=feet+vy*dt;if(vy<=0){int bx=(int)std::floor(px),bz=(int)std::floor(pz),by=(int)std::floor(next-.01f);
-            if(solid(bx,by,bz)||solid((int)std::floor(px-.25f),by,bz)||solid((int)std::floor(px+.25f),by,bz)){next=by+1;vy=0;grounded=true;}}
+            if(solid(bx,by,bz)||solid((int)std::floor(px-.25f),by,(int)std::floor(pz-.25f))||
+               solid((int)std::floor(px+.25f),by,(int)std::floor(pz+.25f))||
+               solid((int)std::floor(px-.25f),by,(int)std::floor(pz+.25f))||
+               solid((int)std::floor(px+.25f),by,(int)std::floor(pz-.25f))){next=by+1;vy=0;grounded=true;}}
+            else if(vy>0){int by=(int)std::floor(next+1.8f);if(solid((int)std::floor(px),by,(int)std::floor(pz))){next=by-1.8f;vy=0;}}
             feet=next;if(feet< -20){feet=5;vy=0;}}
         // Keep the feet on the surface of the generated grass layer.
         if(grounded&&feet<1.001f)feet=1.0f;
