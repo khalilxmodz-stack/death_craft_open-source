@@ -13,6 +13,9 @@
 #include <initializer_list>
 #include <tuple>
 #include <time.h>
+#include <android/asset_manager.h>
+#define STB_IMAGE_IMPLEMENTATION
+#include "stb_image.h"
 
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR,"DeathCraft",__VA_ARGS__)
 static constexpr int CS=16, HEIGHT=32, LOAD_RADIUS=4;
@@ -72,7 +75,7 @@ struct Chunk {
 
 class Game {
     EGLDisplay display=EGL_NO_DISPLAY; EGLSurface surface=EGL_NO_SURFACE; EGLContext context=EGL_NO_CONTEXT;
-    GLuint program=0,vao=0,vbo=0; GLint mvpLoc=-1,cameraLoc=-1,fogLoc=-1;
+    GLuint program=0,vao=0,vbo=0,atlasTexture=0; GLint mvpLoc=-1,cameraLoc=-1,fogLoc=-1,textureLoc=-1,atlasLoc=-1;
     int width=1,height=1;
     std::map<uint64_t,Chunk> chunks;
     std::map<std::tuple<int,int,int>,uint8_t> edits;
@@ -90,24 +93,69 @@ class Game {
     GLuint makeShader(GLenum type,const char*src){GLuint s=glCreateShader(type);glShaderSource(s,1,&src,nullptr);glCompileShader(s);GLint ok=0;glGetShaderiv(s,GL_COMPILE_STATUS,&ok);if(!ok){char log[1024];glGetShaderInfoLog(s,1024,nullptr,log);LOGE("Shader: %s",log);}return s;}
     bool setupGL(){
         const char*vs=R"(#version 300 es
-        layout(location=0) in vec3 p; layout(location=1) in vec3 c;
-        uniform mat4 mvp; uniform vec3 cameraPos; out vec3 color; out float fogDistance;
-        void main(){gl_Position=mvp*vec4(p,1.0);color=c;fogDistance=length(p-cameraPos);})";
+        layout(location=0) in vec3 p; layout(location=1) in vec3 c; layout(location=2) in vec2 uvIn;
+        uniform mat4 mvp; uniform vec3 cameraPos; out vec3 color; out float fogDistance; out vec2 texCoord;
+        void main(){gl_Position=mvp*vec4(p,1.0);color=c;texCoord=uvIn;fogDistance=length(p-cameraPos);})";
         const char*fs=R"(#version 300 es
-        precision highp float; in vec3 color; in float fogDistance; uniform float fogEnabled; out vec4 outColor;
-        void main(){vec3 sky=vec3(.48,.74,.96);float fog=fogEnabled*smoothstep(22.0,68.0,fogDistance);outColor=vec4(mix(color,sky,fog),1.0);})";
+        precision highp float; in vec3 color; in float fogDistance; in vec2 texCoord; uniform float fogEnabled; uniform float textured; uniform sampler2D blockAtlas; out vec4 outColor;
+        void main(){vec3 base=color;if(textured>.5)base*=texture(blockAtlas,texCoord).rgb;vec3 sky=vec3(.48,.74,.96);float fog=fogEnabled*smoothstep(22.0,68.0,fogDistance);outColor=vec4(mix(base,sky,fog),1.0);})";
         GLuint a=makeShader(GL_VERTEX_SHADER,vs),b=makeShader(GL_FRAGMENT_SHADER,fs);
         program=glCreateProgram();glAttachShader(program,a);glAttachShader(program,b);glLinkProgram(program);glDeleteShader(a);glDeleteShader(b);
         GLint ok=0;glGetProgramiv(program,GL_LINK_STATUS,&ok);if(!ok)return false;
-        mvpLoc=glGetUniformLocation(program,"mvp");cameraLoc=glGetUniformLocation(program,"cameraPos");fogLoc=glGetUniformLocation(program,"fogEnabled");
+        mvpLoc=glGetUniformLocation(program,"mvp");cameraLoc=glGetUniformLocation(program,"cameraPos");fogLoc=glGetUniformLocation(program,"fogEnabled");textureLoc=glGetUniformLocation(program,"textured");atlasLoc=glGetUniformLocation(program,"blockAtlas");
+        glUseProgram(program);glUniform1i(atlasLoc,0);
         glGenVertexArrays(1,&vao);glGenBuffers(1,&vbo);
         glEnable(GL_DEPTH_TEST);glDisable(GL_CULL_FACE);return true;
     }
-    void addTri(std::vector<float>&v,V3 a,V3 b,V3 c,V3 color){
-        for(V3 p:{a,b,c})v.insert(v.end(),{p.x,p.y,p.z,color.x,color.y,color.z});
+    void addTri(std::vector<float>&v,V3 a,V3 b,V3 c,V3 color,float au=0,float av=0,float bu=1,float bv=0,float cu=1,float cv=1){
+        v.insert(v.end(),{a.x,a.y,a.z,color.x,color.y,color.z,au,av,b.x,b.y,b.z,color.x,color.y,color.z,bu,bv,c.x,c.y,c.z,color.x,color.y,color.z,cu,cv});
     }
     void addFace(std::vector<float>&v,V3 a,V3 b,V3 c,V3 d,V3 color){
-        addTri(v,a,b,c,color);addTri(v,a,c,d,color);
+        addTri(v,a,b,c,color,0,0,1,0,1,1);addTri(v,a,c,d,color,0,0,1,1,0,1);
+    }
+    bool loadTextures(AAssetManager* manager){
+        if(!manager)return false;
+        constexpr int tile=256, atlasW=tile*3;
+        std::vector<unsigned char> atlas((size_t)atlasW*tile*4,255);
+        const char* names[]={"textures/grass_texture.png","textures/dirt_texture.png","textures/stone_texture.png"};
+        int loaded=0;stbi_set_flip_vertically_on_load(1);
+        for(int layer=0;layer<3;layer++){
+            AAsset* asset=AAssetManager_open(manager,names[layer],AASSET_MODE_BUFFER);
+            if(!asset){LOGE("Texture asset missing: %s",names[layer]);continue;}
+            off_t length=AAsset_getLength(asset);std::vector<unsigned char> encoded((size_t)length);
+            int read=(int)AAsset_read(asset,encoded.data(),(size_t)length);AAsset_close(asset);
+            if(read<=0)continue;
+            int w=0,h=0,channels=0;unsigned char* pixels=stbi_load_from_memory(encoded.data(),read,&w,&h,&channels,4);
+            if(!pixels){LOGE("Texture decode failed: %s",names[layer]);continue;}
+            for(int y=0;y<tile;y++)for(int x=0;x<tile;x++){
+                int sx=x*w/tile,sy=y*h/tile;size_t src=((size_t)sy*w+sx)*4;
+                size_t dst=((size_t)y*atlasW+(size_t)layer*tile+x)*4;
+                std::copy(pixels+src,pixels+src+4,atlas.begin()+dst);
+            }
+            stbi_image_free(pixels);loaded++;
+        }
+        glGenTextures(1,&atlasTexture);glActiveTexture(GL_TEXTURE0);glBindTexture(GL_TEXTURE_2D,atlasTexture);
+        glPixelStorei(GL_UNPACK_ALIGNMENT,1);glTexImage2D(GL_TEXTURE_2D,0,GL_RGBA,atlasW,tile,0,GL_RGBA,GL_UNSIGNED_BYTE,atlas.data());
+        glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_NEAREST_MIPMAP_LINEAR);glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_S,GL_CLAMP_TO_EDGE);glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_T,GL_CLAMP_TO_EDGE);glGenerateMipmap(GL_TEXTURE_2D);
+        LOGE("Loaded block textures: %d/3",loaded);return loaded>0;
+    }
+    uint8_t blockAt(int x,int y,int z)const{
+        int cx=floorDiv(x,CS),cz=floorDiv(z,CS);auto it=chunks.find(chunkKey(cx,cz));
+        return it==chunks.end()?0:it->second.get(modp(x,CS),y,modp(z,CS));
+    }
+    void addBlockFace(std::vector<float>&v,V3 a,V3 b,V3 c,V3 d,uint8_t block,int face,int gx,int gy,int gz){
+        int tile=block==3?2:((block==1&&face==2)?0:1);
+        float u0=(tile+.012f)/3.0f,u1=(tile+.988f)/3.0f,v0=.012f,v1=.988f;
+        const float shade[6]={.72f,.84f,1.0f,.38f,.62f,.78f};float light=shade[face];
+        if(block==1&&face==2){
+            bool underTree=false;
+            for(int dz=-2;dz<=2&&!underTree;dz++)for(int dx=-2;dx<=2&&!underTree;dx++)
+                for(int dy=2;dy<=5;dy++)if(blockAt(gx+dx,gy+dy,gz+dz)==5){underTree=true;break;}
+            if(underTree)light*=.52f;
+        }
+        V3 color{light,light,light};
+        addTri(v,a,b,c,color,u0,v0,u1,v0,u1,v1);addTri(v,a,c,d,color,u0,v0,u1,v1,u0,v1);
     }
     bool solid(int x,int y,int z){
         int cx=floorDiv(x,CS),cz=floorDiv(z,CS);auto it=chunks.find(chunkKey(cx,cz));
@@ -170,21 +218,23 @@ class Game {
             float X=(float)(ox+x),Y=(float)y,Z=(float)(oz+z);
             V3 p000{X,Y,Z},p100{X+1,Y,Z},p110{X+1,Y+1,Z},p010{X,Y+1,Z};
             V3 p001{X,Y,Z+1},p101{X+1,Y,Z+1},p111{X+1,Y+1,Z+1},p011{X,Y+1,Z+1};
-            if(!solid(ox+x,y,oz+z-1))addFace(c.mesh,p000,p100,p110,p010,blockColor(b,0));
-            if(!solid(ox+x, y,oz+z+1))addFace(c.mesh,p101,p001,p011,p111,blockColor(b,1));
-            if(!solid(ox+x,y+1,oz+z))addFace(c.mesh,p010,p110,p111,p011,blockColor(b,2));
-            if(!solid(ox+x,y-1,oz+z))addFace(c.mesh,p001,p101,p100,p000,blockColor(b,3));
-            if(!solid(ox+x-1,y,oz+z))addFace(c.mesh,p001,p000,p010,p011,blockColor(b,4));
-            if(!solid(ox+x+1,y,oz+z))addFace(c.mesh,p100,p101,p111,p110,blockColor(b,5));
+            if(!solid(ox+x,y,oz+z-1))addBlockFace(c.mesh,p000,p100,p110,p010,b,0,ox+x,y,oz+z);
+            if(!solid(ox+x,y,oz+z+1))addBlockFace(c.mesh,p101,p001,p011,p111,b,1,ox+x,y,oz+z);
+            if(!solid(ox+x,y+1,oz+z))addBlockFace(c.mesh,p010,p110,p111,p011,b,2,ox+x,y,oz+z);
+            if(!solid(ox+x,y-1,oz+z))addBlockFace(c.mesh,p001,p101,p100,p000,b,3,ox+x,y,oz+z);
+            if(!solid(ox+x-1,y,oz+z))addBlockFace(c.mesh,p001,p000,p010,p011,b,4,ox+x,y,oz+z);
+            if(!solid(ox+x+1,y,oz+z))addBlockFace(c.mesh,p100,p101,p111,p110,b,5,ox+x,y,oz+z);
         }
         c.dirty=false;
     }
-    void draw(const std::vector<float>&v,GLenum mode,const Mat4&m,float cx=0,float cy=0,float cz=0,bool fog=true){
-        if(v.empty())return;glUseProgram(program);glUniformMatrix4fv(mvpLoc,1,GL_FALSE,m.m);glUniform3f(cameraLoc,cx,cy,cz);glUniform1f(fogLoc,fog?1.0f:0.0f);
+    void draw(const std::vector<float>&v,GLenum mode,const Mat4&m,float cx=0,float cy=0,float cz=0,bool fog=true,bool textured=false){
+        if(v.empty())return;glUseProgram(program);glUniformMatrix4fv(mvpLoc,1,GL_FALSE,m.m);glUniform3f(cameraLoc,cx,cy,cz);glUniform1f(fogLoc,fog?1.0f:0.0f);glUniform1f(textureLoc,textured&&atlasTexture?1.0f:0.0f);
+        glActiveTexture(GL_TEXTURE0);glBindTexture(GL_TEXTURE_2D,atlasTexture);
         glBindVertexArray(vao);glBindBuffer(GL_ARRAY_BUFFER,vbo);glBufferData(GL_ARRAY_BUFFER,v.size()*sizeof(float),v.data(),GL_DYNAMIC_DRAW);
-        glEnableVertexAttribArray(0);glVertexAttribPointer(0,3,GL_FLOAT,GL_FALSE,6*sizeof(float),(void*)0);
-        glEnableVertexAttribArray(1);glVertexAttribPointer(1,3,GL_FLOAT,GL_FALSE,6*sizeof(float),(void*)(3*sizeof(float)));
-        glDrawArrays(mode,0,(GLsizei)(v.size()/6));
+        glEnableVertexAttribArray(0);glVertexAttribPointer(0,3,GL_FLOAT,GL_FALSE,8*sizeof(float),(void*)0);
+        glEnableVertexAttribArray(1);glVertexAttribPointer(1,3,GL_FLOAT,GL_FALSE,8*sizeof(float),(void*)(3*sizeof(float)));
+        glEnableVertexAttribArray(2);glVertexAttribPointer(2,2,GL_FLOAT,GL_FALSE,8*sizeof(float),(void*)(6*sizeof(float)));
+        glDrawArrays(mode,0,(GLsizei)(v.size()/8));
     }
     void drawHud(){
         glDisable(GL_DEPTH_TEST);Mat4 m=identity();std::vector<float>v;
@@ -306,7 +356,7 @@ class Game {
     }
     void frame(float dt){
         if(!running||!eglMakeCurrent(display,surface,surface,context))return;dt=std::min(dt,.04f);
-        float forward=-joyY,side=joyX,mag=std::sqrt(forward*forward+side*side);if(mag>1){forward/=mag;side/=mag;}
+        float forward=joyY,side=joyX,mag=std::sqrt(forward*forward+side*side);if(mag>1){forward/=mag;side/=mag;}
         float speed=5.2f;movePlayer((std::sin(yaw)*forward+std::cos(yaw)*side)*speed*dt,(-std::cos(yaw)*forward+std::sin(yaw)*side)*speed*dt);
         if(!grounded){vy-=22*dt;float next=feet+vy*dt;if(vy<=0){int bx=(int)std::floor(px),bz=(int)std::floor(pz),by=(int)std::floor(next-.01f);
             if(solid(bx,by,bz)||solid((int)std::floor(px-.25f),by,(int)std::floor(pz-.25f))||
@@ -321,7 +371,7 @@ class Game {
         updateWorld();
         glViewport(0,0,width,height);glClearColor(.48f,.74f,.96f,1);glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
         Mat4 vp=mul(perspective(1.02f,(float)width/height,.1f,180),camera(px,feet+1.62f,pz,yaw,pitch));
-        for(auto&entry:chunks)draw(entry.second.mesh,GL_TRIANGLES,vp,px,feet+1.62f,pz,true);
+        for(auto&entry:chunks)draw(entry.second.mesh,GL_TRIANGLES,vp,px,feet+1.62f,pz,true,true);
         // Target outline around the block under the crosshair.
         int x,y,z,ax,ay,az;if(raycast(x,y,z,ax,ay,az)){
             float X=x,Y=y,Z=z;std::vector<float> edge;
@@ -335,14 +385,14 @@ class Game {
     }
     void setJoy(float x,float y){joyX=std::clamp((x-joyOriginX)/.20f,-1.0f,1.0f);joyY=std::clamp((y-joyOriginY)/.20f,-1.0f,1.0f);}
 public:
-    bool init(ANativeWindow*w){
+    bool init(ANativeWindow*w,AAssetManager* manager){
         const EGLint attrs[]={EGL_RENDERABLE_TYPE,EGL_OPENGL_ES3_BIT,EGL_SURFACE_TYPE,EGL_WINDOW_BIT,EGL_RED_SIZE,8,EGL_GREEN_SIZE,8,EGL_BLUE_SIZE,8,EGL_ALPHA_SIZE,8,EGL_DEPTH_SIZE,16,EGL_NONE};
         display=eglGetDisplay(EGL_DEFAULT_DISPLAY);if(display==EGL_NO_DISPLAY||!eglInitialize(display,nullptr,nullptr))return false;
         EGLConfig cfg;EGLint count=0;eglChooseConfig(display,attrs,&cfg,1,&count);if(!count)return false;
         const EGLint ca[]={EGL_CONTEXT_CLIENT_VERSION,3,EGL_NONE};context=eglCreateContext(display,cfg,EGL_NO_CONTEXT,ca);surface=eglCreateWindowSurface(display,cfg,w,nullptr);
         if(context==EGL_NO_CONTEXT||surface==EGL_NO_SURFACE||!eglMakeCurrent(display,surface,surface,context))return false;
         eglQuerySurface(display,surface,EGL_WIDTH,&width);eglQuerySurface(display,surface,EGL_HEIGHT,&height);glViewport(0,0,width,height);
-        if(!setupGL())return false;feet=(float)terrainHeight(0,0);inventory[0]={1,32};inventory[1]={2,16};inventory[2]={3,12};inventory[3]={4,4};inventory[4]={6,8};selected=0;running=true;updateWorld();return true;
+        if(!setupGL())return false;loadTextures(manager);feet=(float)terrainHeight(0,0);inventory[0]={1,32};inventory[1]={2,16};inventory[2]={3,12};inventory[3]={4,4};inventory[4]={6,8};selected=0;running=true;updateWorld();return true;
     }
     int input(AInputEvent*e){
         if(AInputEvent_getType(e)!=AINPUT_EVENT_TYPE_MOTION)return 0;int action=AMotionEvent_getAction(e)&AMOTION_EVENT_ACTION_MASK,idx=(AMotionEvent_getAction(e)&AMOTION_EVENT_ACTION_POINTER_INDEX_MASK)>>AMOTION_EVENT_ACTION_POINTER_INDEX_SHIFT;int id=AMotionEvent_getPointerId(e,idx);float x=AMotionEvent_getX(e,idx)/width*2-1,y=1-AMotionEvent_getY(e,idx)/height*2;
@@ -364,7 +414,7 @@ public:
     bool isRunning() const { return running; }
 };
 static Game game;
-static void command(android_app*app,int32_t cmd){if(cmd==APP_CMD_INIT_WINDOW&&app->window){if(!game.init(app->window))LOGE("Game initialization failed");}if(cmd==APP_CMD_TERM_WINDOW)game.shutdown();}
+static void command(android_app*app,int32_t cmd){if(cmd==APP_CMD_INIT_WINDOW&&app->window){if(!game.init(app->window,app->activity->assetManager))LOGE("Game initialization failed");}if(cmd==APP_CMD_TERM_WINDOW)game.shutdown();}
 void android_main(android_app*app){
     app->onAppCmd=command;app->onInputEvent=[](android_app*,AInputEvent*e)->int{return game.input(e);};int64_t previous=0;
     while(true){int events;android_poll_source*source;while(ALooper_pollOnce(game.isRunning()?0:-1,nullptr,&events,(void**)&source)>=0){if(source)source->process(app,source);if(app->destroyRequested){game.shutdown();return;}}
