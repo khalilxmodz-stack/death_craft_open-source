@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.22.1)
-project(deathcraft LANGUAGES CXX)
+project(deathcraft LANGUAGES C CXX)
 
 add_library(android_native_app_glue STATIC
     "${ANDROID_NDK}/sources/android/native_app_glue/android_native_app_glue.c"
