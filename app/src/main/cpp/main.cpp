@@ -267,7 +267,7 @@ class Game {
         if(!running||!eglMakeCurrent(display,surface,surface,context))return;dt=std::min(dt,.04f);
         fpsElapsed+=dt;fpsFrames++;if(fpsElapsed>=.5f){fpsValue=(int)(fpsFrames/fpsElapsed);fpsFrames=0;fpsElapsed=0;}
         if(screen!=Screen::PLAYING){glViewport(0,0,width,height);glClearColor(.10f,.16f,.19f,1);glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);drawMenu();eglSwapBuffers(display,surface);return;}
-        float forward=joyY,side=joyX,mag=std::sqrt(forward*forward+side*side);if(mag>1){forward/=mag;side/=mag;}
+        float forward=-joyY,side=joyX,mag=std::sqrt(forward*forward+side*side);if(mag>1){forward/=mag;side/=mag;}
         float speed=5.2f;movePlayer((std::sin(yaw)*forward+std::cos(yaw)*side)*speed*dt,(-std::cos(yaw)*forward+std::sin(yaw)*side)*speed*dt);
         if(!grounded){vy-=22*dt;float next=feet+vy*dt;if(vy<=0){int bx=(int)std::floor(px),bz=(int)std::floor(pz),by=(int)std::floor(next-.01f);
             if(solid(bx,by,bz)||solid((int)std::floor(px-.25f),by,(int)std::floor(pz-.25f))||
@@ -310,8 +310,8 @@ public:
         int idx=(AMotionEvent_getAction(e)&AMOTION_EVENT_ACTION_POINTER_INDEX_MASK)>>AMOTION_EVENT_ACTION_POINTER_INDEX_SHIFT;
         int id=AMotionEvent_getPointerId(e,idx);float x=AMotionEvent_getX(e,idx)/width*2-1,y=1-AMotionEvent_getY(e,idx)/height*2;
         if(action==AMOTION_EVENT_ACTION_DOWN||action==AMOTION_EVENT_ACTION_POINTER_DOWN){
-            if(screen==Screen::MENU){if(x>-.42f&&x<.42f&&y>-.25f&&y<.12f){screen=Screen::PLAYING;}return 1;}
-            if(screen==Screen::PAUSED){if(x>-.42f&&x<.42f&&y>-.18f&&y<.12f){screen=Screen::PLAYING;}else if(x>-.42f&&x<.42f&&y<-.30f&&y>-.62f){screen=Screen::MENU;}return 1;}
+            if(screen==Screen::MENU){if(x>-.44f&&x<.44f&&y>-.24f&&y<.10f){screen=Screen::PLAYING;}return 1;}
+            if(screen==Screen::PAUSED){if(x>-.44f&&x<.44f&&y>-.24f&&y<.10f){screen=Screen::PLAYING;}else if(x>-.44f&&x<.44f&&y<-.29f&&y>-.57f){screen=Screen::MENU;}return 1;}
             if(x>.80f&&y>.78f){screen=Screen::PAUSED;joyId=lookId=-1;joyX=joyY=0;return 1;}
             if(x<-.42f&&y<.0f){joyId=id;joyOriginX=x;joyOriginY=y;setJoy(x,y);}
             else if(x>.67f&&y<-.40f){if(grounded){vy=7.4f;grounded=false;}}
@@ -325,7 +325,7 @@ public:
             for(size_t i=0;i<AMotionEvent_getPointerCount(e);i++){
                 int pid=AMotionEvent_getPointerId(e,i);float tx=AMotionEvent_getX(e,i)/width*2-1,ty=1-AMotionEvent_getY(e,i)/height*2;
                 if(pid==joyId)setJoy(tx,ty);
-                if(pid==lookId){yaw-=(tx-lastX)*2.7f;pitch=std::clamp(pitch-(ty-lastY)*2.2f,-1.35f,1.35f);lastX=tx;lastY=ty;}
+                if(pid==lookId){yaw+=(tx-lastX)*2.7f;pitch=std::clamp(pitch-(ty-lastY)*2.2f,-1.35f,1.35f);lastX=tx;lastY=ty;}
             }return 1;
         }
         if(action==AMOTION_EVENT_ACTION_UP||action==AMOTION_EVENT_ACTION_POINTER_UP||action==AMOTION_EVENT_ACTION_CANCEL){
