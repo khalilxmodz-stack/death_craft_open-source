@@ -145,7 +145,7 @@ class Game {
         return it==chunks.end()?0:it->second.get(modp(x,CS),y,modp(z,CS));
     }
     void addBlockFace(std::vector<float>&v,V3 a,V3 b,V3 c,V3 d,uint8_t block,int face,int gx,int gy,int gz){
-        int tile=block==3?2:((block==1&&face==2)?0:1);
+        int tile=block==3?2:((block==5||(block==1&&face==2))?0:1);
         float u0=(tile+.012f)/3.0f,u1=(tile+.988f)/3.0f,v0=.012f,v1=.988f;
         const float shade[6]={.72f,.84f,1.0f,.38f,.62f,.78f};float light=shade[face];
         if(block==1&&face==2){
@@ -378,7 +378,7 @@ class Game {
             V3 white{1,.95f,.45f};
             V3 p[8]={{X,Y,Z},{X+1,Y,Z},{X+1,Y+1,Z},{X,Y+1,Z},{X,Y,Z+1},{X+1,Y,Z+1},{X+1,Y+1,Z+1},{X,Y+1,Z+1}};
             int e[24]={0,1,1,2,2,3,3,0,4,5,5,6,6,7,7,4,0,4,1,5,2,6,3,7};
-            for(int i=0;i<24;i+=2){for(int j:{e[i],e[i+1]})edge.insert(edge.end(),{p[j].x,p[j].y,p[j].z,white.x,white.y,white.z});}
+            for(int i=0;i<24;i+=2){for(int j:{e[i],e[i+1]})edge.insert(edge.end(),{p[j].x,p[j].y,p[j].z,white.x,white.y,white.z,0,0});}
             glDisable(GL_CULL_FACE);draw(edge,GL_LINES,vp,px,feet+1.62f,pz,true);
         }
         if(inventoryOpen)drawInventory();else drawHud();eglSwapBuffers(display,surface);
