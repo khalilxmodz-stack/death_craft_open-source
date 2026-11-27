@@ -9,6 +9,8 @@
 #include <set>
 #include <algorithm>
 #include <cstdint>
+#include <string>
+#include <initializer_list>
 #include <time.h>
 
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR,"DeathCraft",__VA_ARGS__)
@@ -90,7 +92,7 @@ class Game {
     }
     void generate(Chunk&c){
         for(int z=0;z<CS;z++)for(int x=0;x<CS;x++){
-            c.set(x,0,z,1);c.set(x,1,z,2);c.set(x,2,z,2);c.set(x,3,z,3);
+            c.set(x,0,z,1);
         }
         c.dirty=true;
     }
@@ -247,11 +249,12 @@ public:
     }
     void shutdown(){running=false;if(display!=EGL_NO_DISPLAY){eglMakeCurrent(display,EGL_NO_SURFACE,EGL_NO_SURFACE,EGL_NO_CONTEXT);if(context!=EGL_NO_CONTEXT)eglDestroyContext(display,context);if(surface!=EGL_NO_SURFACE)eglDestroySurface(display,surface);eglTerminate(display);}display=EGL_NO_DISPLAY;surface=EGL_NO_SURFACE;context=EGL_NO_CONTEXT;}
     void tick(float dt){frame(dt);}
+    bool isRunning() const { return running; }
 };
 static Game game;
 static void command(android_app*app,int32_t cmd){if(cmd==APP_CMD_INIT_WINDOW&&app->window){if(!game.init(app->window))LOGE("Game initialization failed");}if(cmd==APP_CMD_TERM_WINDOW)game.shutdown();}
 void android_main(android_app*app){
     app->onAppCmd=command;app->onInputEvent=[](android_app*,AInputEvent*e)->int{return game.input(e);};int64_t previous=0;
-    while(true){int events;android_poll_source*source;while(ALooper_pollOnce(game.running?0:-1,nullptr,&events,(void**)&source)>=0){if(source)source->process(app,source);if(app->destroyRequested){game.shutdown();return;}}
-        timespec ts{};clock_gettime(CLOCK_MONOTONIC,&ts);int64_t now=(int64_t)ts.tv_sec*1000000000LL+ts.tv_nsec;float dt=previous?(now-previous)/1e9f:.016f;previous=now;if(game.running)game.tick(dt);}
+    while(true){int events;android_poll_source*source;while(ALooper_pollOnce(game.isRunning()?0:-1,nullptr,&events,(void**)&source)>=0){if(source)source->process(app,source);if(app->destroyRequested){game.shutdown();return;}}
+        timespec ts{};clock_gettime(CLOCK_MONOTONIC,&ts);int64_t now=(int64_t)ts.tv_sec*1000000000LL+ts.tv_nsec;float dt=previous?(now-previous)/1e9f:.016f;previous=now;if(game.isRunning())game.tick(dt);}
 }
