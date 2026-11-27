@@ -331,13 +331,13 @@ class Game {
             if(solid(bx,by,bz))return true;
         return false;
     }
-    float groundAt(float x,float z,float reference)const{
+    float groundAt(float x,float z,float reference){
         int bx=(int)std::floor(x),bz=(int)std::floor(z);
         for(int y=(int)std::floor(reference+1.05f);y>=(int)std::floor(reference-.20f);y--)
             if(solid(bx,y,bz))return (float)y+1.0f;
         return reference;
     }
-    bool supported()const{
+    bool supported(){
         const float r=.23f;float samples[5][2]={{px,pz},{px-r,pz-r},{px+r,pz-r},{px-r,pz+r},{px+r,pz+r}};
         for(auto&q:samples)if(solid((int)std::floor(q[0]),(int)std::floor(feet-.06f),(int)std::floor(q[1])))return true;
         return false;
