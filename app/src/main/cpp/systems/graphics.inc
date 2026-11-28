@@ -1,7 +1,9 @@
 // Subsystem: OpenGL ES shader setup, geometry helpers, and texture loading.
 // Function comments describe each method's responsibility and its place in the game systems.
 
+    // Compiles one OpenGL ES shader and reports compilation errors.
     GLuint makeShader(GLenum type,const char*src){GLuint s=glCreateShader(type);glShaderSource(s,1,&src,nullptr);glCompileShader(s);GLint ok=0;glGetShaderiv(s,GL_COMPILE_STATUS,&ok);if(!ok){char log[1024];glGetShaderInfoLog(s,1024,nullptr,log);LOGE("Shader: %s",log);}return s;}
+    // Creates the OpenGL ES program and configures graphics resources.
     bool setupGL(){
         const char*vs=R"(#version 300 es
         layout(location=0) in vec3 p; layout(location=1) in vec3 c; layout(location=2) in vec2 uvIn;
@@ -18,18 +20,22 @@
         glGenVertexArrays(1,&vao);glGenBuffers(1,&vbo);
         glEnable(GL_DEPTH_TEST);glEnable(GL_BLEND);glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);glDisable(GL_CULL_FACE);return true;
     }
+    // Appends a triangle and its vertex attributes to a mesh buffer.
     void addTri(std::vector<float>&v,V3 a,V3 b,V3 c,V3 color,float au=0,float av=0,float bu=1,float bv=0,float cu=1,float cv=1){
         v.insert(v.end(),{a.x,a.y,a.z,color.x,color.y,color.z,au,av,b.x,b.y,b.z,color.x,color.y,color.z,bu,bv,c.x,c.y,c.z,color.x,color.y,color.z,cu,cv});
     }
+    // Appends a colored quad as two triangles.
     void addFace(std::vector<float>&v,V3 a,V3 b,V3 c,V3 d,V3 color){
         addTri(v,a,b,c,color,0,0,1,0,1,1);addTri(v,a,c,d,color,0,0,1,1,0,1);
     }
 
+    // Applies the selected texture filtering mode.
     void applyGraphicsFiltering(){
         GLenum filter=smoothGraphics?GL_LINEAR:GL_NEAREST;
         if(atlasTexture){glBindTexture(GL_TEXTURE_2D,atlasTexture);glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,filter);glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,smoothGraphics?GL_LINEAR_MIPMAP_LINEAR:GL_NEAREST);}
         if(khalilTexture){glBindTexture(GL_TEXTURE_2D,khalilTexture);glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,filter);glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,filter);}
     }
+    // Loads the texture used by the Khalil character.
     void loadKhalilTexture(AAssetManager* manager){
         std::vector<unsigned char> pixels;
         int w=1,h=1,channels=4;
@@ -50,6 +56,7 @@
         glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_S,GL_CLAMP_TO_EDGE);glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_T,GL_CLAMP_TO_EDGE);
     }
 
+    // Loads the block atlas and other game textures.
     bool loadTextures(AAssetManager* manager){
         if(!manager)return false;
         constexpr int tile=256, atlasTiles=12, atlasW=tile*atlasTiles;
