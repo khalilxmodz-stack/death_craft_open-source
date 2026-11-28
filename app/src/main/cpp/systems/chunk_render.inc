@@ -27,15 +27,15 @@
             float X=(float)(ox+x),Y=(float)y,Z=(float)(oz+z);
             V3 p000{X,Y,Z},p100{X+1,Y,Z},p110{X+1,Y+1,Z},p010{X,Y+1,Z};
             V3 p001{X,Y,Z+1},p101{X+1,Y,Z+1},p111{X+1,Y+1,Z+1},p011{X,Y+1,Z+1};
-            if(b==20||b==21){
+            if(b==22||b==23){continue;}else if(b==20||b==21){
                 float x0=X+.06f,x1=X+.94f,z0=b==20?Z+.43f:Z+.06f,z1=b==20?Z+.57f:Z+.94f;
                 auto quad=[&](float ax,float ay,float az,float bx,float by,float bz,float cx,float cy,float cz,float dx,float dy,float dz,uint8_t mat){addBlockFace(c.mesh,{ax,ay,az},{bx,by,bz},{cx,cy,cz},{dx,dy,dz},mat,0,ox+x,y,oz+z,blockLight);};
                 // Light oak door slab with a darker inset frame and four small square peephole panels.
-                quad(x0,Y,x0==0?Z:z0,x1,Y,z0,x1,Y+1,z0,x0,Y+1,z0,20);
-                quad(x0,Y+1,z1,x1,Y+1,z1,x1,Y,z1,x0,Y,z1,20);
-                quad(x0,Y,z0,x0,Y,z1,x0,Y+1,z1,x0,Y+1,z0,20);
-                quad(x1,Y,z1,x1,Y,z0,x1,Y+1,z0,x1,Y+1,z1,20);
-                for(int row=0;row<2;row++)for(int col=0;col<2;col++){float hx=x0+.24f+col*.25f,hy=Y+.40f+row*.22f,hz=b==20?z0-.004f:z1+.004f;float hs=.075f; if(b==20)quad(hx,hy,hz,hx+hs,hy,hz,hx+hs,hy+hs,hz,hx,hy+hs,hz,19);else quad(hx,hy,hz,hx,hy,hz-hs,hx,hy+hs,hz-hs,hx,hy+hs,hz,19);}
+                quad(x0,Y,z0,x1,Y,z0,x1,Y+2,z0,x0,Y+2,z0,20);
+                quad(x0,Y+2,z1,x1,Y+2,z1,x1,Y,z1,x0,Y,z1,20);
+                quad(x0,Y,z0,x0,Y,z1,x0,Y+2,z1,x0,Y+2,z0,20);
+                quad(x1,Y,z1,x1,Y,z0,x1,Y+2,z0,x1,Y+2,z1,20);
+                for(int row=0;row<2;row++)for(int col=0;col<2;col++){float hx=x0+.24f+col*.25f,hy=Y+.78f+row*.34f,hz=b==20?z0-.004f:z1+.004f;float hs=.075f; if(b==20)quad(hx,hy,hz,hx+hs,hy,hz,hx+hs,hy+hs,hz,hx,hy+hs,hz,19);else quad(hx,hy,hz,hx,hy,hz-hs,hx,hy+hs,hz-hs,hx,hy+hs,hz,19);}
             }else if(b==18){
                 auto box=[&](float x0,float y0,float z0,float x1,float y1,float z1,uint8_t material){V3 a{x0,y0,z0},bb{x1,y0,z0},cc{x1,y1,z0},dd{x0,y1,z0},e{x0,y0,z1},f{x1,y0,z1},g{x1,y1,z1},h{x0,y1,z1};addBlockFace(c.mesh,a,bb,cc,dd,material,0,ox+x,y,oz+z,blockLight);addBlockFace(c.mesh,f,e,h,g,material,1,ox+x,y,oz+z,blockLight);addBlockFace(c.mesh,dd,cc,g,h,material,2,ox+x,y,oz+z,blockLight);addBlockFace(c.mesh,e,f,bb,a,material,3,ox+x,y,oz+z,blockLight);addBlockFace(c.mesh,e,a,dd,h,material,4,ox+x,y,oz+z,blockLight);addBlockFace(c.mesh,bb,f,g,cc,material,5,ox+x,y,oz+z,blockLight);};
                 box(X+.05f,Y+.08f,Z+.05f,X+.95f,Y+.22f,Z+.95f,4);
