@@ -1,9 +1,14 @@
     void updateWorld(){
         int cx=floorDiv((int)std::floor(px),CS),cz=floorDiv((int)std::floor(pz),CS);
-        // Create nearby chunks first so the visible area becomes ready before the horizon.
-        for(int radius=0;radius<=drawDistance;radius++)
-            for(int z=-radius;z<=radius;z++)for(int x=-radius;x<=radius;x++)
-                if(std::max(std::abs(x),std::abs(z))==radius)ensureChunk(cx+x,cz+z);
+        // Stream a few nearby chunks per frame; keep generation out of a single long frame.
+        int generationBudget=4;
+        for(int radius=0;radius<=drawDistance&&generationBudget>0;radius++)
+            for(int z=-radius;z<=radius&&generationBudget>0;z++)for(int x=-radius;x<=radius&&generationBudget>0;x++)
+                if(std::max(std::abs(x),std::abs(z))==radius){
+                    uint64_t key=chunkKey(cx+x,cz+z);
+                    if(chunks.find(key)==chunks.end())--generationBudget;
+                    ensureChunk(cx+x,cz+z);
+                }
         for(auto it=chunks.begin();it!=chunks.end();){
             if(std::abs(it->second.cx-cx)>drawDistance+1||std::abs(it->second.cz-cz)>drawDistance+1){
                 if(it->second.meshVbo)glDeleteBuffers(1,&it->second.meshVbo);
