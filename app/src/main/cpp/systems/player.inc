@@ -54,6 +54,7 @@
             if(lanMode){LanPacket packet{};packet.type=3;packet.player=networkId;packet.bx=ax;packet.by=ay;packet.bz=az;packet.block=item;sendLan(packet);}
         }else{
             uint8_t broken=0;auto it=chunks.find(chunkKey(floorDiv(x,CS),floorDiv(z,CS)));if(it!=chunks.end())broken=it->second.get(modp(x,CS),y,modp(z,CS));if(broken==19){breaking=false;breakTimer=0;return;}
+            if(broken==20||broken==21){int doorY=y+1;Chunk&dc=ensureChunk(floorDiv(x,CS),floorDiv(z,CS));dc.set(modp(x,CS),doorY,modp(z,CS),0);edits[{x,doorY,z}]=0;markBlockDirty(x,doorY,z);}
             int cx=floorDiv(x,CS),cz=floorDiv(z,CS);Chunk&c=ensureChunk(cx,cz);c.set(modp(x,CS),y,modp(z,CS),0);edits[{x,y,z}]=0;waterFlowDepth.erase({x,y,z});markBlockDirty(x,y,z);
             uint8_t dropId=broken==4?4:(broken==5?5:(broken==13?17:(broken==3?3:((broken==1||broken==2)?2:(broken==6?6:broken)))));
             if(dropId)spawnBlockEffects(x,y,z,dropId);
@@ -62,6 +63,9 @@
     }
     void useTarget(){
         int x,y,z,ax,ay,az;
+        if(raycast(x,y,z,ax,ay,az)&&(blockAt(x,y,z)==20||blockAt(x,y,z)==21)){
+            uint8_t next=blockAt(x,y,z)==20?21:20;Chunk& doorChunk=ensureChunk(floorDiv(x,CS),floorDiv(z,CS));doorChunk.set(modp(x,CS),y,modp(z,CS),next);edits[{x,y,z}]=next;markBlockDirty(x,y,z);if(lanMode){LanPacket packet{};packet.type=3;packet.player=networkId;packet.bx=x;packet.by=y;packet.bz=z;packet.block=next;sendLan(packet);}return;
+        }
         if(raycast(x,y,z,ax,ay,az)&&blockAt(x,y,z)==18){if(!isNight()){status="YOU CAN ONLY SLEEP AT NIGHT";statusFrames=100;return;}if(lanMode==2){status="ONLY HOST CAN SLEEP";statusFrames=100;return;}dayClock=300.0f;nightActive=false;grafikAlive=false;khalilAlive=false;skeletonAlive=false;skeletonArrows.clear();khalilPrimed=false;khalilFuse=0;updateSky();saveWorld();status="GOOD MORNING";statusFrames=120;return;}
         if(inventory[selected].count>0&&inventory[selected].id==11){attackMonster();return;}if(inventory[selected].count>0&&(inventory[selected].id==12||inventory[selected].id==15||inventory[selected].id==16)){status="TOOL EQUIPPED";statusFrames=45;return;}
         if(raycast(x,y,z,ax,ay,az)&&blockAt(x,y,z)==8){inventoryOpen=true;craftingTableOpen=true;dragIndex=-1;status="CRAFTING TABLE OPEN";statusFrames=70;return;}
@@ -78,6 +82,7 @@
     }
     void attackMonster(){
         if(playerDead||swordCooldown>0)return;
+        playSound(0);
         bool swordEquipped=inventory[selected].count>0&&inventory[selected].id==11;
         float skx=skeletonX-px,skz=skeletonZ-pz,skDist=std::sqrt(skx*skx+skz*skz);float fx0=std::sin(yaw),fz0=-std::cos(yaw);float skFacing=skDist>.001f?(skx*fx0+skz*fz0)/skDist:1.0f;if(skeletonAlive&&skDist<=3.6f&&skFacing>.30f){skeletonHealth=std::max(0,skeletonHealth-(swordEquipped?3:1));skeletonHitTimer=.28f;if(skeletonHealth<=0){skeletonAlive=false;skeletonRespawn=0;}swordCooldown=swordEquipped?.34f:.55f;status=skeletonHealth<=0?"SKELETON DEFEATED":"SKELETON HIT";statusFrames=80;return;}
         int damage=swordEquipped?3:1;
