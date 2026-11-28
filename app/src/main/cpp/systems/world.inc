@@ -32,7 +32,7 @@
         chunks.clear();edits.clear();waterFlowDepth.clear();waterSimulationTimer=0;inventory={};health=10;armor=10;grafikHealth=6;grafikHitTimer=0;grafikAlive=true;playerDead=false;swallowTimer=0;
         px=0;pz=0;yaw=0;pitch=0;vy=0;feet=(float)groundHeight(0,0);grounded=true;
         bool loaded=loadWorld();
-        if(loaded){bool hasTnt=false,hasSword=false,hasPickaxe=false;for(const auto&i:inventory){if(i.id==10&&i.count>0)hasTnt=true;if(i.id==11&&i.count>0)hasSword=true;if(i.id==12&&i.count>0)hasPickaxe=true;}if(!hasTnt){if(inventory[4].id==5)inventory[8]=inventory[4];inventory[4]=Item{10,creativeMode?999999:4};}if(!hasSword)inventory[9]=Item{11,creativeMode?999999:1};if(!hasPickaxe)inventory[10]=Item{12,creativeMode?999999:1};}
+        if(loaded){bool hasTnt=false,hasSword=false,hasPickaxe=false;for(const auto&i:inventory){if(i.id==10&&i.count>0)hasTnt=true;if(i.id==11&&i.count>0)hasSword=true;if(i.id==12&&i.count>0)hasPickaxe=true;}if(!hasTnt){if(inventory[4].id==5)inventory[8]=inventory[4];inventory[4]=Item{10,creativeMode?999999:4};}if(!hasSword)inventory[9]=Item{11,creativeMode?999999:1};if(!hasPickaxe)addItem(12,creativeMode?999999:1);}
         if(!loaded){
             px=0;pz=0;
             if(!flatWorld){for(int radius=0;radius<80&&groundHeight((int)px,(int)pz)<=SEA_LEVEL;radius++){px=(float)(radius+1);pz=(float)((radius%2)?radius/2:-radius/2);}}
