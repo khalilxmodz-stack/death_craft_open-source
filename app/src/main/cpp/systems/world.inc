@@ -30,7 +30,8 @@
     }
     void cycleGameMode(){if(!creativeMode&&!spectatorMode){creativeMode=true;spectatorMode=false;status="CREATIVE MODE";}else if(creativeMode){creativeMode=false;spectatorMode=true;status="SPECTATOR MODE";}else{creativeMode=false;spectatorMode=false;status="SURVIVAL MODE";}if(creativeMode)for(auto&i:inventory)if(i.id)i.count=999999;statusFrames=90;}
     void startWorld(){
-        chunks.clear();edits.clear();waterFlowDepth.clear();waterSimulationTimer=0;inventory={};health=10;armor=10;grafikHealth=6;grafikHitTimer=0;grafikAlive=true;playerDead=false;swallowTimer=0;
+        for(auto&entry:chunks)if(entry.second.meshVbo)glDeleteBuffers(1,&entry.second.meshVbo);
+        chunks.clear();dirtyChunkQueue.clear();edits.clear();waterFlowDepth.clear();waterSimulationTimer=0;inventory={};health=10;armor=10;grafikHealth=6;grafikHitTimer=0;grafikAlive=true;playerDead=false;swallowTimer=0;
         px=0;pz=0;yaw=0;pitch=0;vy=0;feet=(float)groundHeight(0,0);grounded=true;
         bool loaded=loadWorld();spectatorMode=false;
         if(loaded){bool hasTnt=false,hasSword=false,hasPickaxe=false;for(const auto&i:inventory){if(i.id==10&&i.count>0)hasTnt=true;if(i.id==11&&i.count>0)hasSword=true;if(i.id==12&&i.count>0)hasPickaxe=true;}if(!hasTnt){if(inventory[4].id==5)inventory[8]=inventory[4];inventory[4]=Item{10,creativeMode?999999:4};}if(!hasSword)inventory[9]=Item{11,creativeMode?999999:1};if(!hasPickaxe)addItem(12,creativeMode?999999:1);}
@@ -50,23 +51,35 @@
         int cx=floorDiv(x,CS),cz=floorDiv(z,CS);auto it=chunks.find(chunkKey(cx,cz));
         return it==chunks.end()?0:it->second.get(modp(x,CS),y,modp(z,CS));
     }
-    void addBlockFace(std::vector<float>&v,V3 a,V3 b,V3 c,V3 d,uint8_t block,int face,int gx,int gy,int gz){
+    void addBlockFace(std::vector<float>&v,V3 a,V3 b,V3 c,V3 d,uint8_t block,int face,int gx,int gy,int gz,float blockLight=-1.0f){
         int tile=block==11?6:(block==10?5:(block==9?4:(block==3?2:(block==5?3:(block==4?7:(block==13?8:(block==14?9:(block==8?10:((block==1&&face==2)?0:1)))))))));
         float u0=(tile+.012f)/12.0f,u1=(tile+.988f)/12.0f,v0=.012f,v1=.988f;
-        const float shade[6]={.72f,.84f,1.0f,.38f,.62f,.78f};float light=shade[face];
-        if(block==1&&face==2){
-            bool underTree=false;
-            for(int dz=-2;dz<=2&&!underTree;dz++)for(int dx=-2;dx<=2&&!underTree;dx++)
-                for(int dy=2;dy<=5;dy++)if(blockAt(gx+dx,gy+dy,gz+dz)==5){underTree=true;break;}
-            if(underTree)light*=.52f;
-        }
-        bool skyVisible=true;for(int sy=gy+1;sy<HEIGHT;sy++)if(solid(gx,sy,gz)){skyVisible=false;break;}float ambient=skyVisible?1.0f:.24f;int occlusion=0;const int ox4[4]={-1,1,0,0},oz4[4]={0,0,-1,1};for(int n=0;n<4;n++)if(solid(gx+ox4[n],gy,gz+oz4[n]))occlusion++;light*=std::max(.18f,ambient*(1.0f-occlusion*.10f));V3 color=(block==10||block==13||block==14||block==8)?V3{light,light,light}:(block==9?V3{.22f*light,.52f*light,.88f*light}:V3{light,light,light});
+        const float shade[6]={.72f,.84f,1.0f,.38f,.62f,.78f};
+        float light=shade[face]*(blockLight>=0.0f?blockLight:1.0f);V3 color=(block==10||block==13||block==14||block==8)?V3{light,light,light}:(block==9?V3{.22f*light,.52f*light,.88f*light}:V3{light,light,light});
         addTri(v,a,b,c,color,u0,v0,u1,v0,u1,v1);addTri(v,a,c,d,color,u0,v0,u1,v1,u0,v1);
     }
     bool solid(int x,int y,int z){
         int cx=floorDiv(x,CS),cz=floorDiv(z,CS);auto it=chunks.find(chunkKey(cx,cz));
         if(it==chunks.end())return y<0;
         uint8_t b=it->second.get(modp(x,CS),y,modp(z,CS));return b!=0&&b!=9;
+    }
+    void markChunkDirty(int cx,int cz){
+        auto it=chunks.find(chunkKey(cx,cz));
+        if(it==chunks.end())return;
+        if(!it->second.dirty){it->second.dirty=true;dirtyChunkQueue.push_back(chunkKey(cx,cz));}
+    }
+    void markBlockDirty(int x,int y,int z){
+        (void)y;
+        const int cx=floorDiv(x,CS),cz=floorDiv(z,CS),lx=modp(x,CS),lz=modp(z,CS);
+        markChunkDirty(cx,cz);
+        if(lx==0)markChunkDirty(cx-1,cz);
+        if(lx==CS-1)markChunkDirty(cx+1,cz);
+        if(lz==0)markChunkDirty(cx,cz-1);
+        if(lz==CS-1)markChunkDirty(cx,cz+1);
+        if(lx==0&&lz==0)markChunkDirty(cx-1,cz-1);
+        if(lx==0&&lz==CS-1)markChunkDirty(cx-1,cz+1);
+        if(lx==CS-1&&lz==0)markChunkDirty(cx+1,cz-1);
+        if(lx==CS-1&&lz==CS-1)markChunkDirty(cx+1,cz+1);
     }
     void generate(Chunk&c){
         int ox=c.cx*CS,oz=c.cz*CS;
@@ -137,7 +150,11 @@
     }
     Chunk& ensureChunk(int cx,int cz){
         uint64_t k=chunkKey(cx,cz);auto it=chunks.find(k);
-        if(it==chunks.end()){Chunk c;c.cx=cx;c.cz=cz;generate(c);it=chunks.emplace(k,std::move(c)).first;}
+        if(it==chunks.end()){
+            Chunk c;c.cx=cx;c.cz=cz;generate(c);
+            it=chunks.emplace(k,std::move(c)).first;
+            dirtyChunkQueue.push_back(k);
+        }
         return it->second;
     }
     V3 blockColor(uint8_t b,int face){
