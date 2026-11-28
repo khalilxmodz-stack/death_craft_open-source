@@ -96,7 +96,7 @@ class Game {
     GLuint program=0,vao=0,vbo=0,atlasTexture=0,khalilTexture=0;
     SLObjectItf slEngineObject=nullptr,slOutputMix=nullptr;
     SLEngineItf slEngine=nullptr;
-    SLObjectItf slPlayers[3]{}; SLPlayItf slPlay[3]{}; AAsset* soundAssets[3]{}; int soundFds[3]{-1,-1,-1};
+    SLObjectItf slPlayers[3]{}; SLPlayItf slPlay[3]{}; SLSeekItf slSeek[3]{}; AAsset* soundAssets[3]{}; int soundFds[3]{-1,-1,-1};
     float footstepTimer=0.0f; GLint mvpLoc=-1,cameraLoc=-1,fogLoc=-1,textureLoc=-1,atlasLoc=-1,skyColorLoc=-1,animTimeLoc=-1,waterAnimationLoc=-1,fogStartLoc=-1,fogEndLoc=-1,worldLightLoc=-1;
     V3 skyTint{.48f,.74f,.96f};
     float dayClock=0.0f,animationTime=0.0f;
@@ -186,21 +186,21 @@ class Game {
             SLDataSource source{&loc,&fmt};
             SLDataLocator_OutputMix out{SL_DATALOCATOR_OUTPUTMIX,slOutputMix};
             SLDataSink sink{&out,nullptr};
-            const SLInterfaceID pids[]={SL_IID_PLAY};const SLboolean preq[]={SL_BOOLEAN_TRUE};
+            const SLInterfaceID pids[]={SL_IID_PLAY,SL_IID_SEEK};const SLboolean preq[]={SL_BOOLEAN_TRUE,SL_BOOLEAN_FALSE};
             if((*slEngine)->CreateAudioPlayer(slEngine,&slPlayers[i],&source,&sink,1,pids,preq)==SL_RESULT_SUCCESS&&
                (*slPlayers[i])->Realize(slPlayers[i],SL_BOOLEAN_FALSE)==SL_RESULT_SUCCESS)
-                (*slPlayers[i])->GetInterface(slPlayers[i],SL_IID_PLAY,&slPlay[i]);
+                {(*slPlayers[i])->GetInterface(slPlayers[i],SL_IID_PLAY,&slPlay[i]);(*slPlayers[i])->GetInterface(slPlayers[i],SL_IID_SEEK,&slSeek[i]);}
             if(!slPlayers[i]){close(fd);soundFds[i]=-1;}
         }
     }
     void playSound(int id){
         if(id<0||id>=3||!slPlay[id])return;
         (*slPlay[id])->SetPlayState(slPlay[id],SL_PLAYSTATE_STOPPED);
-        (*slPlay[id])->SetPosition(slPlay[id],0,SL_SEEKMODE_FAST);
+        if(slSeek[id])(*slSeek[id])->SetPosition(slSeek[id],0,SL_SEEKMODE_FAST);
         (*slPlay[id])->SetPlayState(slPlay[id],SL_PLAYSTATE_PLAYING);
     }
     void shutdownAudio(){
-        for(int i=0;i<3;i++){if(slPlayers[i]){(*slPlayers[i])->Destroy(slPlayers[i]);slPlayers[i]=nullptr;slPlay[i]=nullptr;}if(soundFds[i]>=0){close(soundFds[i]);soundFds[i]=-1;}if(soundAssets[i]){AAsset_close(soundAssets[i]);soundAssets[i]=nullptr;}}
+        for(int i=0;i<3;i++){if(slPlayers[i]){(*slPlayers[i])->Destroy(slPlayers[i]);slPlayers[i]=nullptr;slPlay[i]=nullptr;slSeek[i]=nullptr;}if(soundFds[i]>=0){close(soundFds[i]);soundFds[i]=-1;}if(soundAssets[i]){AAsset_close(soundAssets[i]);soundAssets[i]=nullptr;}}
         if(slOutputMix){(*slOutputMix)->Destroy(slOutputMix);slOutputMix=nullptr;}
         if(slEngineObject){(*slEngineObject)->Destroy(slEngineObject);slEngineObject=nullptr;slEngine=nullptr;}
     }
