@@ -25,7 +25,7 @@
 #include "stb_image.h"
 
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR,"DeathCraft",__VA_ARGS__)
-static constexpr int CS=16, HEIGHT=32, LOAD_RADIUS=7;
+static constexpr int CS=16, HEIGHT=32;
 static constexpr float PI=3.14159265f;
 static constexpr int SEA_LEVEL=6;
 
@@ -86,7 +86,7 @@ struct LanPacket { uint32_t magic=0x44434654u; uint8_t type=0; uint32_t player=0
 
 class Game {
     EGLDisplay display=EGL_NO_DISPLAY; EGLSurface surface=EGL_NO_SURFACE; EGLContext context=EGL_NO_CONTEXT;
-    GLuint program=0,vao=0,vbo=0,atlasTexture=0,khalilTexture=0; GLint mvpLoc=-1,cameraLoc=-1,fogLoc=-1,textureLoc=-1,atlasLoc=-1,skyColorLoc=-1,animTimeLoc=-1,waterAnimationLoc=-1;
+    GLuint program=0,vao=0,vbo=0,atlasTexture=0,khalilTexture=0; GLint mvpLoc=-1,cameraLoc=-1,fogLoc=-1,textureLoc=-1,atlasLoc=-1,skyColorLoc=-1,animTimeLoc=-1,waterAnimationLoc=-1,fogStartLoc=-1,fogEndLoc=-1;
     V3 skyTint{.48f,.74f,.96f};
     float dayClock=0.0f,animationTime=0.0f;
     struct DroppedItem{uint8_t id=0;float x=0,y=0,z=0,vx=0,vy=0,vz=0,age=0;};
@@ -95,7 +95,8 @@ class Game {
     std::vector<DroppedItem> droppedItems;
     std::vector<BlockParticle> blockParticles;
     std::vector<PrimedTnt> primedTnts;
-    float khalilX=9.0f,khalilFeet=1.0f,khalilZ=0.0f,khalilFuse=0.0f,khalilRespawn=0.0f;
+    float khalilX=9.0f,khalilFeet=1.0f,khalilZ=0.0f,khalilFuse=0.0f,khalilRespawn=0.0f,khalilHitTimer=0.0f;
+    int khalilHealth=8;
     bool khalilAlive=true,khalilPrimed=false;
     float explosionEffectTimer=0.0f,explosionX=0,explosionY=0,explosionZ=0;
     std::string deathMessage="GRAFIK ATE YOU";
@@ -111,7 +112,10 @@ class Game {
     bool inventoryOpen=false,breaking=false;
     int selected=0,breakPointer=-1,breakX=0,breakY=0,breakZ=0,dragIndex=-1,dragPointer=-1;
     float breakTimer=0;
-    int health=10,armor=10,grafikHealth=2;
+    int health=10,armor=10,grafikHealth=6;
+    float grafikHitTimer=0.0f;
+    bool smoothGraphics=true,settingsOpen=false;
+    int drawDistance=7;
     bool creativeMode=true,flatWorld=false,inWorld=false;
     int selectedSlot=0;
     std::string saveDirectory;
@@ -154,11 +158,12 @@ public:
     int input(AInputEvent*e){
         if(AInputEvent_getType(e)!=AINPUT_EVENT_TYPE_MOTION)return 0;int action=AMotionEvent_getAction(e)&AMOTION_EVENT_ACTION_MASK,idx=(AMotionEvent_getAction(e)&AMOTION_EVENT_ACTION_POINTER_INDEX_MASK)>>AMOTION_EVENT_ACTION_POINTER_INDEX_SHIFT;int id=AMotionEvent_getPointerId(e,idx);float x=AMotionEvent_getX(e,idx)/width*2-1,y=1-AMotionEvent_getY(e,idx)/height*2;
         if(action==AMOTION_EVENT_ACTION_DOWN||action==AMOTION_EVENT_ACTION_POINTER_DOWN){
-            if(!inWorld){if(nameEditing){if(y<-.43f){if(x>.25f){if(!playerName.empty())playerName.pop_back();savePlayerName();}else{nameEditing=false;savePlayerName();}return 1;}int row=std::clamp((int)((.25f-y)/.20f),0,3);const char* rows[]={"ABCDEFG","HIJKLMN","OPQRSTU","VWXYZ"};int col=std::clamp((int)((x+.70f)/.19f),0,6);if(rows[row][col]&&playerName.size()<16){playerName.push_back(rows[row][col]);savePlayerName();}return 1;}if(y>.49f&&y<.68f){nameEditing=true;return 1;}if(y>.14f&&y<.34f){creativeMode=x<0;return 1;}if(y>-.20f&&y<.00f){flatWorld=x<0;return 1;}if(y>-.55f&&y<-.33f){selectedSlot=std::clamp((int)((x+.62f)/.44f),0,2);return 1;}if(y<-.68f){startWorld();return 1;}return 1;}
-            if(inventoryOpen){if(x>.62f&&y>.55f){inventoryOpen=false;dragIndex=-1;return 1;}if(x>.55f&&x<.80f&&y>.20f&&y<.43f){craft(0);return 1;}if(x>.55f&&x<.80f&&y>-.08f&&y<.16f){craft(1);return 1;}if(x>.55f&&x<.80f&&y>-.38f&&y<-.12f){craft(2);return 1;}int slot=inventorySlotAt(x,y);if(slot>=0){dragIndex=slot;dragPointer=id;}return 1;}
+            if(!inWorld){if(settingsOpen){if(x>.62f&&y>.55f){settingsOpen=false;return 1;}if(y>.05f&&y<.30f){smoothGraphics=!smoothGraphics;applyGraphicsFiltering();return 1;}if(y>-.35f&&y<-.02f){drawDistance=std::clamp(drawDistance+(x<-.12f?-1:1),3,10);return 1;}return 1;}if(x>.68f&&y>.70f){settingsOpen=true;return 1;}if(nameEditing){if(y<-.43f){if(x>.25f){if(!playerName.empty())playerName.pop_back();savePlayerName();}else{nameEditing=false;savePlayerName();}return 1;}int row=std::clamp((int)((.25f-y)/.20f),0,3);const char* rows[]={"ABCDEFG","HIJKLMN","OPQRSTU","VWXYZ"};int col=std::clamp((int)((x+.70f)/.19f),0,6);if(rows[row][col]&&playerName.size()<16){playerName.push_back(rows[row][col]);savePlayerName();}return 1;}if(y>.49f&&y<.68f){nameEditing=true;return 1;}if(y>.14f&&y<.34f){creativeMode=x<0;return 1;}if(y>-.20f&&y<.00f){flatWorld=x<0;return 1;}if(y>-.55f&&y<-.33f){selectedSlot=std::clamp((int)((x+.62f)/.44f),0,2);return 1;}if(y<-.68f){startWorld();return 1;}return 1;}
+            if(settingsOpen){if(x>.62f&&y>.55f){settingsOpen=false;return 1;}if(y>.05f&&y<.30f){smoothGraphics=!smoothGraphics;applyGraphicsFiltering();return 1;}if(y>-.35f&&y<-.02f){drawDistance=std::clamp(drawDistance+(x<-.12f?-1:1),3,10);return 1;}return 1;}if(inventoryOpen){if(x>.62f&&y>.55f){inventoryOpen=false;dragIndex=-1;return 1;}if(x>.55f&&x<.80f&&y>.20f&&y<.43f){craft(0);return 1;}if(x>.55f&&x<.80f&&y>-.08f&&y<.16f){craft(1);return 1;}if(x>.55f&&x<.80f&&y>-.38f&&y<-.12f){craft(2);return 1;}int slot=inventorySlotAt(x,y);if(slot>=0){dragIndex=slot;dragPointer=id;}return 1;}
             if(x>-.95f&&x<-.72f&&y<-.90f){setLanMode(2);return 1;}
             if(x>-.70f&&x<-.47f&&y<-.90f){setLanMode(1);return 1;}
             if(x>.81f&&y>.72f){inventoryOpen=true;joyId=lookId=-1;joyX=joyY=0;breaking=false;return 1;}
+            if(x>.82f&&y>.48f&&y<.68f){settingsOpen=true;joyId=lookId=-1;joyX=joyY=0;return 1;}
             if(x<-.42f&&y<0&&y>-.88f){joyId=id;joyOriginX=x;joyOriginY=y;setJoy(x,y);}
             else if(x>.65f&&y<-.43f){if(inWater()){vy=3.4f;grounded=false;fallTracking=false;}else if(grounded){vy=7.4f;grounded=false;fallStartFeet=feet;fallPeakFeet=feet;fallTracking=true;}}
             else if(x>.65f&&y>-.34f&&y<.12f){int tx,ty,tz,ax,ay,az;if(raycast(tx,ty,tz,ax,ay,az)){breaking=true;breakPointer=id;breakX=tx;breakY=ty;breakZ=tz;breakTimer=0;}}
@@ -168,7 +173,7 @@ public:
             else{lookId=id;lastX=x;lastY=y;}return 1;
         }
         if(action==AMOTION_EVENT_ACTION_MOVE){for(size_t n=0;n<AMotionEvent_getPointerCount(e);n++){int pid=AMotionEvent_getPointerId(e,n);float tx=AMotionEvent_getX(e,n)/width*2-1,ty=1-AMotionEvent_getY(e,n)/height*2;if(pid==joyId)setJoy(tx,ty);if(pid==lookId){yaw+=(tx-lastX)*1.45f;pitch=std::clamp(pitch-(ty-lastY)*1.15f,-1.35f,1.35f);lastX=tx;lastY=ty;}}return 1;}
-        if(action==AMOTION_EVENT_ACTION_UP||action==AMOTION_EVENT_ACTION_POINTER_UP||action==AMOTION_EVENT_ACTION_CANCEL){if(action==AMOTION_EVENT_ACTION_CANCEL){joyId=lookId=breakPointer=dragPointer=-1;joyX=joyY=0;breaking=false;dragIndex=-1;return 1;}if(id==joyId){joyId=-1;joyX=joyY=0;}if(id==lookId)lookId=-1;if(id==breakPointer){breakPointer=-1;breaking=false;breakTimer=0;}if(inventoryOpen&&id==dragPointer&&dragIndex>=0){int target=inventorySlotAt(x,y);if(target>=0&&target!=dragIndex)std::swap(inventory[target],inventory[dragIndex]);dragIndex=dragPointer=-1;}return 1;}return 1;
+        if(action==AMOTION_EVENT_ACTION_UP||action==AMOTION_EVENT_ACTION_POINTER_UP||action==AMOTION_EVENT_ACTION_CANCEL){if(action==AMOTION_EVENT_ACTION_CANCEL){joyId=lookId=breakPointer=dragPointer=-1;joyX=joyY=0;breaking=false;dragIndex=-1;return 1;}if(id==joyId){joyId=-1;joyX=joyY=0;}if(id==lookId)lookId=-1;if(id==breakPointer){breakPointer=-1;breaking=false;breakTimer=0;}if(inventoryOpen&&id==dragPointer&&dragIndex>=0){int target=inventorySlotAt(x,y);if(target>=0&&target!=dragIndex)std::swap(inventory[target],inventory[dragIndex]);else if(target<0){Item dropped=inventory[dragIndex];if(dropped.count>0){spawnDroppedItem(dropped.id,px+std::sin(yaw)*1.0f,feet+.7f,pz-std::cos(yaw)*1.0f);inventory[dragIndex]={};}}dragIndex=dragPointer=-1;}return 1;}return 1;
     }
     void shutdown(){if(inWorld)saveWorld();running=false;if(lanSocket>=0){close(lanSocket);lanSocket=-1;}lanMode=0;remoteValid=false;if(display!=EGL_NO_DISPLAY){eglMakeCurrent(display,EGL_NO_SURFACE,EGL_NO_SURFACE,EGL_NO_CONTEXT);if(context!=EGL_NO_CONTEXT)eglDestroyContext(display,context);if(surface!=EGL_NO_SURFACE)eglDestroySurface(display,surface);eglTerminate(display);}display=EGL_NO_DISPLAY;surface=EGL_NO_SURFACE;context=EGL_NO_CONTEXT;}
     void tick(float dt){frame(dt);}
