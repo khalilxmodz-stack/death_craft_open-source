@@ -16,7 +16,7 @@
         c.dirty=false;
     }
     void draw(const std::vector<float>&v,GLenum mode,const Mat4&m,float cx=0,float cy=0,float cz=0,bool fog=true,bool textured=false,GLuint textureOverride=0,bool animateWater=true){
-        if(v.empty())return;glUseProgram(program);glUniformMatrix4fv(mvpLoc,1,GL_FALSE,m.m);glUniform3f(cameraLoc,cx,cy,cz);glUniform1f(fogLoc,fog?1.0f:0.0f);glUniform1f(textureLoc,textured&&(textureOverride||atlasTexture)?1.0f:0.0f);glUniform3f(skyColorLoc,skyTint.x,skyTint.y,skyTint.z);glUniform1f(animTimeLoc,animationTime);glUniform1f(waterAnimationLoc,textured&&!textureOverride&&animateWater?1.0f:0.0f);
+        if(v.empty())return;glUseProgram(program);glUniformMatrix4fv(mvpLoc,1,GL_FALSE,m.m);glUniform3f(cameraLoc,cx,cy,cz);glUniform1f(fogLoc,fog?1.0f:0.0f);glUniform1f(textureLoc,textured&&(textureOverride||atlasTexture)?1.0f:0.0f);glUniform3f(skyColorLoc,skyTint.x,skyTint.y,skyTint.z);glUniform1f(animTimeLoc,animationTime);glUniform1f(waterAnimationLoc,textured&&!textureOverride&&animateWater?1.0f:0.0f);glUniform1f(fogStartLoc,(float)drawDistance*CS*1.05f);glUniform1f(fogEndLoc,(float)drawDistance*CS*1.65f);
         glActiveTexture(GL_TEXTURE0);glBindTexture(GL_TEXTURE_2D,textureOverride?textureOverride:atlasTexture);
         glBindVertexArray(vao);glBindBuffer(GL_ARRAY_BUFFER,vbo);glBufferData(GL_ARRAY_BUFFER,v.size()*sizeof(float),v.data(),GL_DYNAMIC_DRAW);
         glEnableVertexAttribArray(0);glVertexAttribPointer(0,3,GL_FLOAT,GL_FALSE,8*sizeof(float),(void*)0);
@@ -25,8 +25,8 @@
         glDrawArrays(mode,0,(GLsizei)(v.size()/8));
     }
     void drawBlockIcon(uint8_t id,float x,float y,float w,float h){
-        int tile=id==10?5:(id==9?4:(id==3?2:(id==5?3:((id==1)?0:1))));
-        float u0=(tile+.035f)/6.0f,u1=(tile+.965f)/6.0f,v0=.035f,v1=.965f;
+        int tile=id==11?6:(id==10?5:(id==9?4:(id==3?2:(id==5?3:((id==1)?0:1)))));
+        float u0=(tile+.035f)/7.0f,u1=(tile+.965f)/7.0f,v0=.035f,v1=.965f;
         std::vector<float> icon;V3 white{1,1,1};
         addTri(icon,{x,y,0},{x+w,y,0},{x+w,y+h,0},white,u0,v0,u1,v0,u1,v1);
         addTri(icon,{x,y,0},{x+w,y+h,0},{x,y+h,0},white,u0,v0,u1,v1,u0,v1);
@@ -42,6 +42,7 @@
         rect(-.70f,-.985f,.20f,.075f,lanMode==1?V3{.12f,.40f,.78f}:V3{.06f,.20f,.42f});
         drawText("JOIN",-.91f,-.925f,.012f,{1,1,1});drawText("HOST",-.67f,-.925f,.012f,{1,1,1});
         drawText("FPS:"+std::to_string((int)fpsValue),.63f,.68f,.018f,{1,1,1});
+        rect(.84f,.57f,.13f,.10f,{.04f,.05f,.07f});drawText("SET",.875f,.60f,.012f,{1,1,1});
         circ(joyOriginX,joyOriginY,.255f,{.01f,.01f,.015f});circ(joyOriginX,joyOriginY,.22f,{.14f,.14f,.16f});circ(joyOriginX+joyX*.16f,joyOriginY+joyY*.16f,.105f,{.01f,.01f,.015f});
         circ(.78f,-.62f,.14f,{.01f,.01f,.015f});circ(.78f,-.62f,.115f,{.17f,.17f,.19f});
         circ(.78f,-.10f,.14f,{.01f,.01f,.015f});circ(.78f,-.10f,.115f,{.17f,.17f,.19f});
@@ -74,7 +75,7 @@
         if(armorPercent>0)rect(-.94f,.735f,.43f*(armorPercent/100.0f),.022f,{.25f,.62f,.92f});
         rect(.84f,.79f,.13f,.15f,{.01f,.01f,.015f});rect(.86f,.81f,.09f,.11f,{.2f,.2f,.22f});line(.87f,.87f,.94f,.87f,.009f,{1,1,1});line(.87f,.83f,.94f,.83f,.009f,{1,1,1});
         for(int i=0;i<5;i++){float x=-.28f+i*.115f;rect(x,-.92f,.105f,.16f,i==selected?V3{1,.78f,.18f}:V3{.01f,.01f,.015f});rect(x+.008f,-.912f,.089f,.144f,{.2f,.2f,.22f});if(inventory[i].count){rect(x+.025f,-.88f,.055f,.075f,blockColor(inventory[i].id,2));drawText(inventory[i].count>=999999?"INF":std::to_string(inventory[i].count),x+.060f,-.89f,.007f,{1,1,1});}}
-        draw(v,GL_TRIANGLES,m,0,0,0,false);for(int i=0;i<5;i++)if(inventory[i].count)drawBlockIcon(inventory[i].id,-.28f+i*.115f+.025f,-.88f,.055f,.075f);if(statusFrames>0){drawText(status,-.85f,.66f,.018f,{1,1,1});statusFrames--;}
+        draw(v,GL_TRIANGLES,m,0,0,0,false);for(int i=0;i<5;i++)if(inventory[i].count)drawBlockIcon(inventory[i].id,-.28f+i*.115f+.025f,-.88f,.055f,.075f);if(inventory[selected].id==11&&inventory[selected].count>0)drawBlockIcon(11,.32f,-.73f,.24f,.34f);if(statusFrames>0){drawText(status,-.85f,.66f,.018f,{1,1,1});statusFrames--;}
         if(playerDead){float k=std::clamp(swallowTimer/2.8f,0.0f,1.0f);std::vector<float> overlay;addFace(overlay,{-1,-1,0},{1,-1,0},{1,1,0},{-1,1,0},{.015f+.035f*k,.005f,.018f+.025f*k});draw(overlay,GL_TRIANGLES,identity(),0,0,0,false);std::vector<float>mouth;for(int i=0;i<48;i++){float a=i*2*PI/48,b=(i+1)*2*PI/48;addTri(mouth,{0,0,0},{std::cos(a)*(.10f+.70f*k),std::sin(a)*(.10f+.70f*k),0},{std::cos(b)*(.10f+.70f*k),std::sin(b)*(.10f+.70f*k),0},{.005f,.002f,.008f});}draw(mouth,GL_TRIANGLES,identity(),0,0,0,false);drawText("GRAFIK ATE YOU",-.52f,-.72f,.035f,{1,.25f,.30f});}
         glEnable(GL_DEPTH_TEST);
     }
