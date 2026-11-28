@@ -7,6 +7,7 @@
 #include <array>
 #include <map>
 #include <set>
+#include <deque>
 #include <algorithm>
 #include <cstdint>
 #include <string>
@@ -79,9 +80,11 @@ struct Chunk {
     std::array<uint8_t,CS*CS*HEIGHT> blocks{};
     std::vector<float> mesh;
     std::vector<float> shadowMesh;
+    GLuint meshVbo=0;
+    GLsizei meshVertexCount=0;
     bool dirty=true;
     uint8_t get(int x,int y,int z)const{return (x<0||x>=CS||z<0||z>=CS||y<0||y>=HEIGHT)?0:blocks[(y*CS+z)*CS+x];}
-    void set(int x,int y,int z,uint8_t b){if(x>=0&&x<CS&&z>=0&&z<CS&&y>=0&&y<HEIGHT){blocks[(y*CS+z)*CS+x]=b;dirty=true;}}
+    void set(int x,int y,int z,uint8_t b){if(x>=0&&x<CS&&z>=0&&z<CS&&y>=0&&y<HEIGHT)blocks[(y*CS+z)*CS+x]=b;}
 };
 
 struct LanPacket { uint32_t magic=0x44434654u; uint8_t type=0; uint32_t player=0; float x=0,y=0,z=0,yaw=0; int32_t bx=0,by=0,bz=0; uint8_t block=0; uint8_t flags=0; char name[24]{}; };
@@ -111,6 +114,7 @@ class Game {
     std::string deathMessage="GRAFIK ATE YOU";
     int width=1,height=1;
     std::map<uint64_t,Chunk> chunks;
+    std::deque<uint64_t> dirtyChunkQueue;
     std::map<std::tuple<int,int,int>,uint8_t> edits;
     float px=0,feet=1.0f,pz=0,yaw=0,pitch=0,vy=0;
     float fallStartFeet=0,fallPeakFeet=0;
