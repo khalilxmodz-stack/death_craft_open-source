@@ -111,28 +111,8 @@
     }
     void drawBlockIcon(uint8_t id,float x,float y,float w,float h){
         std::vector<float> icon;V3 white{1,1,1};
-        if(false && (id==15||id==16)){float cx=x+w*.5f;addTri(icon,{cx-w*.06f,y+h*.05f,0},{cx+w*.06f,y+h*.05f,0},{cx+w*.045f,y+h*.67f,0},{.48f,.28f,.12f});addTri(icon,{cx-w*.06f,y+h*.05f,0},{cx+w*.045f,y+h*.67f,0},{cx-w*.045f,y+h*.67f,0},{.60f,.36f,.16f});if(id==15){addTri(icon,{cx-w*.02f,y+h*.68f,0},{x+w*.14f,y+h*.96f,0},{x+w*.48f,y+h*.78f,0},{.57f,.34f,.14f});addTri(icon,{cx-w*.02f,y+h*.68f,0},{x+w*.48f,y+h*.78f,0},{x+w*.84f,y+h*.96f,0},{.57f,.34f,.14f});}else{addTri(icon,{x+w*.12f,y+h*.68f,0},{x+w*.88f,y+h*.68f,0},{x+w*.78f,y+h*.84f,0},{.62f,.39f,.17f});addTri(icon,{x+w*.12f,y+h*.68f,0},{x+w*.78f,y+h*.84f,0},{x+w*.22f,y+h*.84f,0},{.72f,.48f,.22f});}draw(icon,GL_TRIANGLES,identity(),0,0,0,false,false,0,false);return;}
         if(id==20){float l=x+w*.18f,r=x+w*.82f,b=y+h*.04f,t=y+h*.96f;addFace(icon,{l,b,0},{r,b,0},{r,t,0},{l,t,0},{.58f,.34f,.15f});addFace(icon,{l+.035f,b+.025f,0},{r-.035f,b+.025f,0},{r-.035f,t-.025f,0},{l+.035f,t-.025f,0},{.76f,.49f,.25f});for(int row=0;row<2;row++)for(int col=0;col<2;col++){float hx=l+.16f+col*w*.17f,hy=b+.48f*h+row*h*.17f;addFace(icon,{hx,hy,0},{hx+w*.10f,hy,0},{hx+w*.10f,hy+h*.09f,0},{hx,hy+h*.09f,0},{.22f,.12f,.065f});}draw(icon,GL_TRIANGLES,identity(),0,0,0,false,false,0,false);return;}
         if(id==18){addTri(icon,{x+w*.08f,y+h*.22f,0},{x+w*.92f,y+h*.22f,0},{x+w*.92f,y+h*.62f,0},{.55f,.16f,.18f});addTri(icon,{x+w*.08f,y+h*.22f,0},{x+w*.92f,y+h*.62f,0},{x+w*.08f,y+h*.62f,0},{.88f,.22f,.25f});addTri(icon,{x+w*.12f,y+h*.62f,0},{x+w*.88f,y+h*.62f,0},{x+w*.78f,y+h*.90f,0},{.86f,.88f,.92f});addTri(icon,{x+w*.12f,y+h*.62f,0},{x+w*.78f,y+h*.90f,0},{x+w*.22f,y+h*.90f,0},{1,1,1});draw(icon,GL_TRIANGLES,identity(),0,0,0,false,false,0,false);return;}
-        if(false && id==12){
-            float cx=x+w*.5f,hy=y+h*.63f;
-            addTri(icon,{cx-w*.055f,y+h*.04f,0},{cx+w*.055f,y+h*.04f,0},{cx+w*.04f,hy,0},{.42f,.23f,.09f});
-            addTri(icon,{cx-w*.055f,y+h*.04f,0},{cx+w*.04f,hy,0},{cx-w*.04f,hy,0},{.54f,.32f,.13f});
-            addTri(icon,{x+w*.13f,hy,0},{x+w*.87f,hy,0},{x+w*.77f,y+h*.80f,0},{.72f,.77f,.84f});
-            addTri(icon,{x+w*.13f,hy,0},{x+w*.77f,y+h*.80f,0},{x+w*.23f,y+h*.80f,0},{.88f,.91f,.96f});
-            addTri(icon,{x+w*.23f,y+h*.80f,0},{x+w*.77f,y+h*.80f,0},{cx,y+h*.98f,0},{.58f,.64f,.73f});
-            draw(icon,GL_TRIANGLES,identity(),0,0,0,false,false,0,false);return;
-        }
-        if(false && id==11){
-            float cx=x+w*.5f;
-            addTri(icon,{cx-w*.11f,y+h*.22f,0},{cx+w*.11f,y+h*.22f,0},{cx,y+h*.98f,0},{.88f,.92f,.98f});
-            addTri(icon,{cx-w*.11f,y+h*.22f,0},{cx,y+h*.98f,0},{cx-w*.02f,y+h*.22f,0},{.98f,.99f,1});
-            addTri(icon,{x+w*.18f,y+h*.18f,0},{x+w*.82f,y+h*.18f,0},{x+w*.76f,y+h*.27f,0},{.72f,.76f,.82f});
-            addTri(icon,{x+w*.18f,y+h*.18f,0},{x+w*.76f,y+h*.27f,0},{x+w*.24f,y+h*.27f,0},{.72f,.76f,.82f});
-            addTri(icon,{cx-w*.07f,y+h*.18f,0},{cx+w*.07f,y+h*.18f,0},{cx+w*.06f,y+h*.02f,0},{.38f,.21f,.09f});
-            addTri(icon,{cx-w*.07f,y+h*.18f,0},{cx+w*.06f,y+h*.02f,0},{cx-w*.06f,y+h*.02f,0},{.48f,.28f,.12f});
-            draw(icon,GL_TRIANGLES,identity(),0,0,0,false,false,0,false);return;
-        }
         // Use the same atlas textures for inventory and hotbar item icons.
         int tile = 1;
         if (id == 1) tile = 0;
