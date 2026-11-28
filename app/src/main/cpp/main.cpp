@@ -96,7 +96,7 @@ class Game {
     GLuint program=0,vao=0,vbo=0,atlasTexture=0,khalilTexture=0;
     SLObjectItf slEngineObject=nullptr,slOutputMix=nullptr;
     SLEngineItf slEngine=nullptr;
-    SLObjectItf slPlayers[3]{}; SLPlayItf slPlay[3]{}; AAsset* soundAssets[3]{};
+    SLObjectItf slPlayers[3]{}; SLPlayItf slPlay[3]{}; AAsset* soundAssets[3]{}; int soundFds[3]{-1,-1,-1};
     float footstepTimer=0.0f; GLint mvpLoc=-1,cameraLoc=-1,fogLoc=-1,textureLoc=-1,atlasLoc=-1,skyColorLoc=-1,animTimeLoc=-1,waterAnimationLoc=-1,fogStartLoc=-1,fogEndLoc=-1,worldLightLoc=-1;
     V3 skyTint{.48f,.74f,.96f};
     float dayClock=0.0f,animationTime=0.0f;
@@ -180,7 +180,7 @@ class Game {
             std::string path="textures/sound/"+std::string(names[i]);
             soundAssets[i]=AAssetManager_open(manager,path.c_str(),AASSET_MODE_UNKNOWN);
             if(!soundAssets[i])continue;
-            off_t start=0,length=0;int fd=AAsset_openFileDescriptor(soundAssets[i],&start,&length);if(fd<0)continue;
+            off_t start=0,length=0;int fd=AAsset_openFileDescriptor(soundAssets[i],&start,&length);if(fd<0)continue;soundFds[i]=fd;
             SLDataLocator_AndroidFD loc{SL_DATALOCATOR_ANDROIDFD,fd,start,length};
             SLDataFormat_MIME fmt{SL_DATAFORMAT_MIME,nullptr,SL_CONTAINERTYPE_MP3};
             SLDataSource source{&loc,&fmt};
@@ -190,7 +190,7 @@ class Game {
             if((*slEngine)->CreateAudioPlayer(slEngine,&slPlayers[i],&source,&sink,1,pids,preq)==SL_RESULT_SUCCESS&&
                (*slPlayers[i])->Realize(slPlayers[i],SL_BOOLEAN_FALSE)==SL_RESULT_SUCCESS)
                 (*slPlayers[i])->GetInterface(slPlayers[i],SL_IID_PLAY,&slPlay[i]);
-            close(fd);
+            if(!slPlayers[i]){close(fd);soundFds[i]=-1;}
         }
     }
     void playSound(int id){
@@ -200,7 +200,7 @@ class Game {
         (*slPlay[id])->SetPlayState(slPlay[id],SL_PLAYSTATE_PLAYING);
     }
     void shutdownAudio(){
-        for(int i=0;i<3;i++){if(slPlayers[i]){(*slPlayers[i])->Destroy(slPlayers[i]);slPlayers[i]=nullptr;slPlay[i]=nullptr;}if(soundAssets[i]){AAsset_close(soundAssets[i]);soundAssets[i]=nullptr;}}
+        for(int i=0;i<3;i++){if(slPlayers[i]){(*slPlayers[i])->Destroy(slPlayers[i]);slPlayers[i]=nullptr;slPlay[i]=nullptr;}if(soundFds[i]>=0){close(soundFds[i]);soundFds[i]=-1;}if(soundAssets[i]){AAsset_close(soundAssets[i]);soundAssets[i]=nullptr;}}
         if(slOutputMix){(*slOutputMix)->Destroy(slOutputMix);slOutputMix=nullptr;}
         if(slEngineObject){(*slEngineObject)->Destroy(slEngineObject);slEngineObject=nullptr;slEngine=nullptr;}
     }
