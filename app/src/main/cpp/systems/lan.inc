@@ -30,8 +30,8 @@
                 float mx=(p.flags&1)?grafikX:khalilX,mz=(p.flags&1)?grafikZ:khalilZ;
                 float dx=mx-p.x,dz=mz-p.z,dist=std::sqrt(dx*dx+dz*dz),facing=dist>.001f?(dx*std::sin(p.yaw)-dz*std::cos(p.yaw))/dist:1.0f;
                 if(dist<=3.8f&&facing>.25f){
-                    if(p.flags&1){if(grafikAlive){grafikHealth=std::max(0,grafikHealth-3);grafikHitTimer=.28f;if(grafikHealth<=0){grafikAlive=false;grafikRespawn=0;}}}
-                    else if(khalilAlive){khalilHealth=std::max(0,khalilHealth-3);khalilHitTimer=.28f;if(khalilHealth<=0){khalilAlive=false;khalilRespawn=0;khalilPrimed=false;khalilFuse=0;}}
+                    if(p.flags&1){if(grafikAlive){grafikHealth=std::max(0,grafikHealth-(int)std::max<uint8_t>(1,p.block));grafikHitTimer=.28f;if(grafikHealth<=0){grafikAlive=false;grafikRespawn=0;}}}
+                    else if(khalilAlive){khalilHealth=std::max(0,khalilHealth-(int)std::max<uint8_t>(1,p.block));khalilHitTimer=.28f;if(khalilHealth<=0){khalilAlive=false;khalilRespawn=0;khalilPrimed=false;khalilFuse=0;}}
                     LanPacket state{};state.type=7;state.player=networkId;state.flags=p.flags&1;state.block=(p.flags&1)?grafikHealth:khalilHealth;sendLan(state);
                 }
             }
