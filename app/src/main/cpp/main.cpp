@@ -86,7 +86,9 @@ struct LanPacket { uint32_t magic=0x44434654u; uint8_t type=0; uint32_t player=0
 
 class Game {
     EGLDisplay display=EGL_NO_DISPLAY; EGLSurface surface=EGL_NO_SURFACE; EGLContext context=EGL_NO_CONTEXT;
-    GLuint program=0,vao=0,vbo=0,atlasTexture=0; GLint mvpLoc=-1,cameraLoc=-1,fogLoc=-1,textureLoc=-1,atlasLoc=-1;
+    GLuint program=0,vao=0,vbo=0,atlasTexture=0; GLint mvpLoc=-1,cameraLoc=-1,fogLoc=-1,textureLoc=-1,atlasLoc=-1,skyColorLoc=-1;
+    V3 skyTint{.48f,.74f,.96f};
+    float dayClock=0.0f;
     int width=1,height=1;
     std::map<uint64_t,Chunk> chunks;
     std::map<std::tuple<int,int,int>,uint8_t> edits;
@@ -142,7 +144,7 @@ public:
     int input(AInputEvent*e){
         if(AInputEvent_getType(e)!=AINPUT_EVENT_TYPE_MOTION)return 0;int action=AMotionEvent_getAction(e)&AMOTION_EVENT_ACTION_MASK,idx=(AMotionEvent_getAction(e)&AMOTION_EVENT_ACTION_POINTER_INDEX_MASK)>>AMOTION_EVENT_ACTION_POINTER_INDEX_SHIFT;int id=AMotionEvent_getPointerId(e,idx);float x=AMotionEvent_getX(e,idx)/width*2-1,y=1-AMotionEvent_getY(e,idx)/height*2;
         if(action==AMOTION_EVENT_ACTION_DOWN||action==AMOTION_EVENT_ACTION_POINTER_DOWN){
-            if(!inWorld){if(nameEditing){if(y<-.43f){if(x>.25f){if(!playerName.empty())playerName.pop_back();savePlayerName();}else{nameEditing=false;savePlayerName();}return 1;}int row=std::clamp((int)((.25f-y)/.20f),0,3);const char* rows[]={"ABCDEFG","HIJKLMN","OPQRSTU","VWXYZ"};int col=std::clamp((int)((x+.70f)/.19f),0,6);if(rows[row][col]&&playerName.size()<16){playerName.push_back(rows[row][col]);savePlayerName();}return 1;}if(y>.44f&&y<.60f){nameEditing=true;return 1;}if(y>.32f){creativeMode=x<0;return 1;}if(y>.02f&&y<.27f){flatWorld=x<0;return 1;}if(y>-.40f&&y<-.12f){selectedSlot=std::clamp((int)((x+.62f)/.44f),0,2);return 1;}if(y<-.52f){startWorld();return 1;}return 1;}
+            if(!inWorld){if(nameEditing){if(y<-.43f){if(x>.25f){if(!playerName.empty())playerName.pop_back();savePlayerName();}else{nameEditing=false;savePlayerName();}return 1;}int row=std::clamp((int)((.25f-y)/.20f),0,3);const char* rows[]={"ABCDEFG","HIJKLMN","OPQRSTU","VWXYZ"};int col=std::clamp((int)((x+.70f)/.19f),0,6);if(rows[row][col]&&playerName.size()<16){playerName.push_back(rows[row][col]);savePlayerName();}return 1;}if(y>.49f&&y<.68f){nameEditing=true;return 1;}if(y>.14f&&y<.34f){creativeMode=x<0;return 1;}if(y>-.20f&&y<.00f){flatWorld=x<0;return 1;}if(y>-.55f&&y<-.33f){selectedSlot=std::clamp((int)((x+.62f)/.44f),0,2);return 1;}if(y<-.68f){startWorld();return 1;}return 1;}
             if(inventoryOpen){if(x>.62f&&y>.55f){inventoryOpen=false;dragIndex=-1;return 1;}if(x>.55f&&x<.80f&&y>.20f&&y<.43f){craft(0);return 1;}if(x>.55f&&x<.80f&&y>-.08f&&y<.16f){craft(1);return 1;}if(x>.55f&&x<.80f&&y>-.38f&&y<-.12f){craft(2);return 1;}int slot=inventorySlotAt(x,y);if(slot>=0){dragIndex=slot;dragPointer=id;}return 1;}
             if(x>-.95f&&x<-.72f&&y<-.90f){setLanMode(2);return 1;}
             if(x>-.70f&&x<-.47f&&y<-.90f){setLanMode(1);return 1;}

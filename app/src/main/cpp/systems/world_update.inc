@@ -6,11 +6,50 @@
         }
         for(auto&entry:chunks)if(entry.second.dirty)rebuild(entry.second);
     }
+    void updateSky(){
+        float phase=dayClock/1200.0f;
+        float h=std::sin(phase*2.0f*PI);
+        float daylight=std::clamp((h+.12f)/.42f,0.0f,1.0f);
+        float dusk=1.0f-std::clamp(std::abs(h)/.38f,0.0f,1.0f);
+        V3 night{.012f,.018f,.055f},day{.48f,.74f,.96f},dawn{.92f,.34f,.16f};
+        skyTint={night.x+(day.x-night.x)*daylight,night.y+(day.y-night.y)*daylight,night.z+(day.z-night.z)*daylight};
+        float warm=dusk*(1.0f-daylight)*.78f;
+        skyTint={skyTint.x+(dawn.x-skyTint.x)*warm,skyTint.y+(dawn.y-skyTint.y)*warm,skyTint.z+(dawn.z-skyTint.z)*warm};
+    }
+    void drawSkyDecor(){
+        float phase=dayClock/1200.0f,angle=phase*2.0f*PI;
+        float h=std::sin(angle),daylight=std::clamp((h+.12f)/.42f,0.0f,1.0f),night=1.0f-daylight;
+        std::vector<float>v;
+        auto square=[&](float x,float y,float s,V3 c){addFace(v,{x-s,y-s,0},{x+s,y-s,0},{x+s,y+s,0},{x-s,y+s,0},c);};
+        auto disc=[&](float x,float y,float r,V3 c){for(int i=0;i<28;i++){float a=i*2*PI/28,b=(i+1)*2*PI/28;addTri(v,{x,y,0},{x+std::cos(a)*r,y+std::sin(a)*r,0},{x+std::cos(b)*r,y+std::sin(b)*r,0},c);}};
+        if(night>.01f){
+            for(int i=0;i<72;i++){
+                float x=std::fmod(i*0.6180339f+.13f,1.0f)*1.88f-.94f;
+                float y=.36f+std::fmod(i*0.371f+.27f,1.0f)*.59f;
+                float twinkle=.55f+.45f*std::sin(dayClock*.018f+i*1.7f);
+                float s=(i%9==0?.006f:.0032f)*night;
+                square(x,y,s,{.65f*twinkle*night,.76f*twinkle*night,.98f*twinkle*night});
+            }
+        }
+        if(h>-.18f){
+            float x=-std::cos(angle)*.82f,y=.34f+std::max(0.0f,h)*.48f;
+            disc(x,y,.052f,{1.0f,.86f,.48f});
+            disc(x,y,.070f,{1.0f,.67f,.25f});
+            disc(x,y,.052f,{1.0f,.86f,.48f});
+        }
+        if(h<.18f){
+            float x=std::cos(angle)*.82f,y=.34f+std::max(0.0f,-h)*.48f;
+            disc(x,y,.050f,{.83f,.89f,1.0f});
+            disc(x+.023f,y+.012f,.045f,skyTint);
+        }
+        glDisable(GL_DEPTH_TEST);draw(v,GL_TRIANGLES,identity(),0,0,0,false,false);glEnable(GL_DEPTH_TEST);
+    }
     void frame(float dt){
         fpsAccumulator+=dt;fpsFrames++;if(fpsAccumulator>=0.5f){fpsValue=fpsFrames/fpsAccumulator;fpsFrames=0;fpsAccumulator=0;}
         if(!running||!eglMakeCurrent(display,surface,surface,context))return;dt=std::min(dt,.04f);
         if(!inWorld){glViewport(0,0,width,height);glClearColor(.10f,.18f,.25f,1);glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);drawMenu();eglSwapBuffers(display,surface);return;}
         if(playerDead){swallowTimer+=dt;if(swallowTimer>2.8f){playerDead=false;swallowTimer=0;health=10;armor=10;px=0;pz=0;feet=(float)groundHeight(0,0);vy=0;grounded=true;grafikX=6;grafikZ=-5;grafikFeet=(float)groundHeight(6,-5);grafikAlive=true;grafikHealth=2;} }
+        dayClock=std::fmod(dayClock+dt,1200.0f);updateSky();
         if(!playerDead){
         float forward=joyY,side=joyX,mag=std::sqrt(forward*forward+side*side);if(mag>1){forward/=mag;side/=mag;}
         bool swimming=inWater();float speed=swimming?2.8f:5.2f;movePlayer((std::sin(yaw)*forward+std::cos(yaw)*side)*speed*dt,(-std::cos(yaw)*forward+std::sin(yaw)*side)*speed*dt);
@@ -44,7 +83,7 @@
         updateLan(dt);
         if(inWorld){saveTimer+=dt;if(saveTimer>=12.0f){saveWorld();saveTimer=0;}}
         updateWorld();
-        glViewport(0,0,width,height);glClearColor(.48f,.74f,.96f,1);glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
+        glViewport(0,0,width,height);glClearColor(skyTint.x,skyTint.y,skyTint.z,1);glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);drawSkyDecor();glClear(GL_DEPTH_BUFFER_BIT);
         Mat4 vp=mul(perspective(1.02f,(float)width/height,.1f,240),camera(px,feet+1.62f,pz,yaw,pitch));
         for(auto&entry:chunks)draw(entry.second.mesh,GL_TRIANGLES,vp,px,feet+1.62f,pz,true,true);
         std::vector<float> clouds;

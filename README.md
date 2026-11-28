@@ -1,65 +1,50 @@
 # Death Craft
 
-Death Craft is a native Android voxel sandbox prototype built with **C++20**, the **Android NDK**, **CMake**, and **OpenGL ES 3.0**.
+Native Android voxel sandbox built with **C++20**, Android NDK, CMake, and OpenGL ES 3.0.
 
 ## Features
 
-- First-person voxel sandbox with touch controls.
-- Chunk-based terrain generation and configurable view distance.
-- Visible-face block meshing to avoid rendering hidden cube faces.
-- Block breaking and placement, with a five-slot hotbar.
-- Player movement, jumping, collision, gravity, and survival fall damage.
-- Health and armor HUD.
-- Player name and FPS display.
-- LAN multiplayer host/join prototype over UDP broadcast.
-- Textured sky, terrain blocks, water, and mobile control buttons.
-- World edits and player name are saved locally where supported by the current prototype.
+- First-person block world with touch controls, terrain chunks, block placement and breaking.
+- Creative and Survival modes, flat and normal world types, and three save slots.
+- Health and armor displayed as bars only.
+- Classic pixel-style tree foliage texture at `app/src/main/assets/textures/grass_tree_texture.png`.
+- A complete 20-minute day/night cycle (10 minutes daylight and 10 minutes night), with a moving sun, crescent moon, and stars.
+- Player name, FPS counter, hotbar, inventory, and LAN host/join prototype.
+- World fog and view distance tuned for mobile rendering.
 
 ## Touch controls
 
-- **Left joystick:** move.
-- **Drag on the right side:** rotate the camera.
-- **Jump button:** jump.
-- **Red X:** break the targeted block.
-- **Blue button:** place the selected block.
-- **Bottom hotbar:** select a block type.
-- **Center crosshair:** aim at the block to edit.
-- **LAN JOIN / HOST:** select a multiplayer role from the menu/game UI.
+- Left joystick: move.
+- Drag on the right side: rotate the camera.
+- Jump button: jump.
+- Red X: break the targeted block.
+- Place button: place the selected block.
+- Bottom hotbar: select a block.
+- JOIN / HOST: LAN multiplayer role.
 
 ## Project structure
 
-Native game code is organized by responsibility under `app/src/main/cpp/`:
+- `app/src/main/cpp/main.cpp`: NativeActivity entry point and shared game state.
+- `systems/lan.inc`: LAN sockets and packets.
+- `systems/graphics.inc`: OpenGL shaders, texture loading, and graphics setup.
+- `systems/world.inc`: terrain, blocks, save/load, and world generation.
+- `systems/inventory.inc`: inventory and crafting.
+- `systems/chunk_render.inc`: chunk meshes, rendering, and HUD.
+- `systems/player.inc`: movement, collision, targeting, and block editing.
+- `systems/world_update.inc`: simulation, day/night cycle, sky, and frame update.
+- `systems/menu.inc`: main menu layout and name-entry screen.
+- `app/src/main/assets/textures/`: block, foliage, sky, and control textures.
+- `stb_image.h`: image decoder.
 
-- `main.cpp`: Android NativeActivity entry point, shared game state, and class assembly.
-- `systems/lan.inc`: LAN socket setup and packet exchange.
-- `systems/graphics.inc`: OpenGL setup, shaders, and texture loading.
-- `systems/world.inc`: world data, save/load, terrain and block generation.
-- `systems/inventory.inc`: inventory and crafting operations.
-- `systems/chunk_render.inc`: chunk mesh generation and draw helpers.
-- `systems/player.inc`: player collision, movement, targeting, and block editing.
-- `systems/world_update.inc`: game simulation and frame update.
-- `systems/menu.inc`: main menu and menu rendering.
-- `stb_image.h`: image decoder used for texture assets.
+The `.inc` files are included inside the `Game` class to keep shared state and existing behavior compatible while separating code by responsibility.
 
-The `.inc` files are included inside the `Game` class. This keeps the existing class layout and behavior intact while separating implementation into smaller, responsibility-based files.
+## Build
 
-## Build APK on GitHub
+The GitHub Actions workflow `.github/workflows/android-apk.yml` builds the debug APK. Push to `main` or run **Android APK** manually from the Actions tab, then download the artifact from a successful run.
 
-The workflow at `.github/workflows/android-apk.yml` builds debug APKs for **arm64-v8a** and **armeabi-v7a**.
+## Development notes
 
-1. Open the repository's **Actions** tab.
-2. Select **Android APK**.
-3. Run the workflow manually, or push a commit to `main`.
-4. Download the APK from the completed run's **Artifacts** section.
-
-## Current limitations
-
-- LAN multiplayer is an early prototype and currently targets local-network discovery.
-- World persistence and inventory persistence are still limited; test saving on the target device.
-- Terrain generation and rendering are still being developed.
-- Performance, multiplayer behavior, and device compatibility should be tested on physical Android devices.
-- There is no crafting progression, enemy ecosystem, or audio system comparable to a full commercial sandbox game yet.
-
-## Development
-
-Keep new code in the matching `systems/` file where possible. Shared state and class fields remain in `main.cpp` until a later refactor introduces dedicated headers and independently compiled translation units.
+- The day/night cycle lasts exactly 1,200 seconds (20 minutes) per full cycle.
+- Tree foliage texture is loaded as atlas layer 4 (zero-based index 3).
+- Keep new code in the matching `systems/` file where possible.
+- Test gameplay, lighting, and multiplayer on a physical Android device; CI confirms compilation and APK packaging, not device runtime behavior.

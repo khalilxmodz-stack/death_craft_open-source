@@ -5,12 +5,12 @@
         uniform mat4 mvp; uniform vec3 cameraPos; out vec3 color; out float fogDistance; out vec2 texCoord;
         void main(){gl_Position=mvp*vec4(p,1.0);color=c;texCoord=uvIn;fogDistance=length(p-cameraPos);})";
         const char*fs=R"(#version 300 es
-        precision highp float; in vec3 color; in float fogDistance; in vec2 texCoord; uniform float fogEnabled; uniform float textured; uniform sampler2D blockAtlas; out vec4 outColor;
-        void main(){vec3 base=color;if(textured>.5)base*=texture(blockAtlas,texCoord).rgb;vec3 sky=vec3(.48,.74,.96);float fog=fogEnabled*smoothstep(78.0,126.0,fogDistance);outColor=vec4(mix(base,sky,fog),1.0);})";
+        precision highp float; in vec3 color; in float fogDistance; in vec2 texCoord; uniform float fogEnabled; uniform float textured; uniform sampler2D blockAtlas; uniform vec3 skyColor; out vec4 outColor;
+        void main(){vec3 base=color;if(textured>.5)base*=texture(blockAtlas,texCoord).rgb;float fog=fogEnabled*smoothstep(78.0,126.0,fogDistance);outColor=vec4(mix(base,skyColor,fog),1.0);})";
         GLuint a=makeShader(GL_VERTEX_SHADER,vs),b=makeShader(GL_FRAGMENT_SHADER,fs);
         program=glCreateProgram();glAttachShader(program,a);glAttachShader(program,b);glLinkProgram(program);glDeleteShader(a);glDeleteShader(b);
         GLint ok=0;glGetProgramiv(program,GL_LINK_STATUS,&ok);if(!ok)return false;
-        mvpLoc=glGetUniformLocation(program,"mvp");cameraLoc=glGetUniformLocation(program,"cameraPos");fogLoc=glGetUniformLocation(program,"fogEnabled");textureLoc=glGetUniformLocation(program,"textured");atlasLoc=glGetUniformLocation(program,"blockAtlas");
+        mvpLoc=glGetUniformLocation(program,"mvp");cameraLoc=glGetUniformLocation(program,"cameraPos");fogLoc=glGetUniformLocation(program,"fogEnabled");textureLoc=glGetUniformLocation(program,"textured");atlasLoc=glGetUniformLocation(program,"blockAtlas");skyColorLoc=glGetUniformLocation(program,"skyColor");
         glUseProgram(program);glUniform1i(atlasLoc,0);
         glGenVertexArrays(1,&vao);glGenBuffers(1,&vbo);
         glEnable(GL_DEPTH_TEST);glDisable(GL_CULL_FACE);return true;
