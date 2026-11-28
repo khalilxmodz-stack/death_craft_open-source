@@ -54,7 +54,8 @@
         }else{
             uint8_t broken=0;auto it=chunks.find(chunkKey(floorDiv(x,CS),floorDiv(z,CS)));if(it!=chunks.end())broken=it->second.get(modp(x,CS),y,modp(z,CS));
             int cx=floorDiv(x,CS),cz=floorDiv(z,CS);Chunk&c=ensureChunk(cx,cz);c.set(modp(x,CS),y,modp(z,CS),0);edits[{x,y,z}]=0;
-            if(broken==4)addItem(4,1);else if(broken==5)addItem(5,1);else if(broken==3)addItem(3,1);else if(broken==1||broken==2)addItem(2,1);else if(broken==6)addItem(6,1);
+            uint8_t dropId=broken==4?4:(broken==5?5:(broken==3?3:((broken==1||broken==2)?2:(broken==6?6:broken))));
+            if(dropId)spawnBlockEffects(x,y,z,dropId);
             if(lanMode){LanPacket packet{};packet.type=3;packet.player=networkId;packet.bx=x;packet.by=y;packet.bz=z;packet.block=0;sendLan(packet);}
         }
         // Adjacent chunks may expose a newly visible border face.

@@ -88,7 +88,11 @@ class Game {
     EGLDisplay display=EGL_NO_DISPLAY; EGLSurface surface=EGL_NO_SURFACE; EGLContext context=EGL_NO_CONTEXT;
     GLuint program=0,vao=0,vbo=0,atlasTexture=0; GLint mvpLoc=-1,cameraLoc=-1,fogLoc=-1,textureLoc=-1,atlasLoc=-1,skyColorLoc=-1;
     V3 skyTint{.48f,.74f,.96f};
-    float dayClock=0.0f;
+    float dayClock=0.0f,animationTime=0.0f;
+    struct DroppedItem{uint8_t id=0;float x=0,y=0,z=0,vx=0,vy=0,vz=0,age=0;};
+    struct BlockParticle{float x=0,y=0,z=0,vx=0,vy=0,vz=0,life=0;uint8_t id=0;};
+    std::vector<DroppedItem> droppedItems;
+    std::vector<BlockParticle> blockParticles;
     int width=1,height=1;
     std::map<uint64_t,Chunk> chunks;
     std::map<std::tuple<int,int,int>,uint8_t> edits;

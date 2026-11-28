@@ -8,48 +8,121 @@
     }
     void updateSky(){
         float phase=dayClock/1200.0f;
-        float h=std::sin(phase*2.0f*PI);
-        float daylight=std::clamp((h+.12f)/.42f,0.0f,1.0f);
-        float dusk=1.0f-std::clamp(std::abs(h)/.38f,0.0f,1.0f);
-        V3 night{.012f,.018f,.055f},day{.48f,.74f,.96f},dawn{.92f,.34f,.16f};
+        float daylight=std::clamp(std::sin(phase*2.0f*PI)*2.4f+.15f,0.0f,1.0f);
+        V3 night{.0015f,.002f,.006f},day{.48f,.74f,.96f},dawn{.92f,.34f,.16f};
         skyTint={night.x+(day.x-night.x)*daylight,night.y+(day.y-night.y)*daylight,night.z+(day.z-night.z)*daylight};
-        float warm=dusk*(1.0f-daylight)*.78f;
-        skyTint={skyTint.x+(dawn.x-skyTint.x)*warm,skyTint.y+(dawn.y-skyTint.y)*warm,skyTint.z+(dawn.z-skyTint.z)*warm};
+        float sunHeight=std::sin(phase*2.0f*PI);
+        float dusk=std::clamp(1.0f-std::abs(sunHeight)*3.2f,0.0f,1.0f)*(1.0f-daylight);
+        skyTint={skyTint.x+(dawn.x-skyTint.x)*dusk*.42f,skyTint.y+(dawn.y-skyTint.y)*dusk*.42f,skyTint.z+(dawn.z-skyTint.z)*dusk*.42f};
     }
-    void drawSkyDecor(){
-        float phase=dayClock/1200.0f,angle=phase*2.0f*PI;
-        float h=std::sin(angle),daylight=std::clamp((h+.12f)/.42f,0.0f,1.0f),night=1.0f-daylight;
+    void drawSkyDecor(const Mat4&vp){
+        const float phase=dayClock/1200.0f,angle=phase*2.0f*PI;
+        const float daylight=std::clamp(std::sin(angle)*2.4f+.15f,0.0f,1.0f);
+        const float sunHeight=std::sin(angle);
+        const float night=1.0f-daylight;
+        const V3 camRight{std::cos(yaw),0,std::sin(yaw)};
+        const V3 camUp{-std::sin(yaw)*std::sin(pitch),std::cos(pitch),std::cos(yaw)*std::sin(pitch)};
+        const V3 origin{px,feet+1.62f,pz};
         std::vector<float>v;
-        auto square=[&](float x,float y,float s,V3 c){addFace(v,{x-s,y-s,0},{x+s,y-s,0},{x+s,y+s,0},{x-s,y+s,0},c);};
-        auto disc=[&](float x,float y,float r,V3 c){for(int i=0;i<28;i++){float a=i*2*PI/28,b=(i+1)*2*PI/28;addTri(v,{x,y,0},{x+std::cos(a)*r,y+std::sin(a)*r,0},{x+std::cos(b)*r,y+std::sin(b)*r,0},c);}};
-        if(night>.01f){
-            for(int i=0;i<72;i++){
-                float x=std::fmod(i*0.6180339f+.13f,1.0f)*1.88f-.94f;
-                float y=.36f+std::fmod(i*0.371f+.27f,1.0f)*.59f;
-                float twinkle=.55f+.45f*std::sin(dayClock*.018f+i*1.7f);
-                float s=(i%9==0?.006f:.0032f)*night;
-                square(x,y,s,{.65f*twinkle*night,.76f*twinkle*night,.98f*twinkle*night});
+        auto point=[&](float dx,float dy,float dz,float r,float u,float w){
+            return V3{origin.x+dx*150.0f+camRight.x*u*r+camUp.x*w*r,
+                      origin.y+dy*150.0f+camRight.y*u*r+camUp.y*w*r,
+                      origin.z+dz*150.0f+camRight.z*u*r+camUp.z*w*r};
+        };
+        auto quad=[&](V3 center,float radius,V3 color){
+            V3 right{camRight.x*radius,camRight.y*radius,camRight.z*radius};
+            V3 up{camUp.x*radius,camUp.y*radius,camUp.z*radius};
+            V3 a{center.x-right.x-up.x,center.y-right.y-up.y,center.z-right.z-up.z};
+            V3 b{center.x+right.x-up.x,center.y+right.y-up.y,center.z+right.z-up.z};
+            V3 c{center.x+right.x+up.x,center.y+right.y+up.y,center.z+right.z+up.z};
+            V3 d{center.x-right.x+up.x,center.y-right.y+up.y,center.z-right.z+up.z};
+            addFace(v,a,b,c,d,color);
+        };
+        auto disc=[&](V3 center,float radius,V3 color){
+            for(int i=0;i<32;i++){
+                float a=i*2*PI/32.0f,b=(i+1)*2*PI/32.0f;
+                V3 p0{center.x,center.y,center.z};
+                V3 p1{center.x+camRight.x*std::cos(a)*radius+camUp.x*std::sin(a)*radius,
+                      center.y+camRight.y*std::cos(a)*radius+camUp.y*std::sin(a)*radius,
+                      center.z+camRight.z*std::cos(a)*radius+camUp.z*std::sin(a)*radius};
+                V3 p2{center.x+camRight.x*std::cos(b)*radius+camUp.x*std::sin(b)*radius,
+                      center.y+camRight.y*std::cos(b)*radius+camUp.y*std::sin(b)*radius,
+                      center.z+camRight.z*std::cos(b)*radius+camUp.z*std::sin(b)*radius};
+                addTri(v,p0,p1,p2,color);
+            }
+        };
+        if(night>.92f){
+            for(int i=0;i<90;i++){
+                float a=(float)((terrainHash(i*17+31,i*43+7)&0xffff)/65535.0f)*2.0f*PI;
+                float y=.10f+(float)((terrainHash(i*29+3,i*11+91)&0xffff)/65535.0f)*.88f;
+                float radial=std::sqrt(std::max(0.0f,1.0f-y*y));
+                float dx=std::cos(a)*radial,dz=std::sin(a)*radial;
+                V3 center=point(dx,y,dz,0,0,0);
+                float size=(i%8==0?.42f:.22f);
+                quad(center,size,{1.0f,.88f,.25f});
             }
         }
-        if(h>-.18f){
-            float x=-std::cos(angle)*.82f,y=.34f+std::max(0.0f,h)*.48f;
-            disc(x,y,.052f,{1.0f,.86f,.48f});
-            disc(x,y,.070f,{1.0f,.67f,.25f});
-            disc(x,y,.052f,{1.0f,.86f,.48f});
+        if(sunHeight>-.03f){
+            float dx=std::cos(angle),dy=std::max(.025f,sunHeight),dz=.30f;
+            float len=std::sqrt(dx*dx+dy*dy+dz*dz);dx/=len;dy/=len;dz/=len;
+            V3 center=point(dx,dy,dz,0,0,0);
+            disc(center,3.2f,{1.0f,.83f,.42f});
         }
-        if(h<.18f){
-            float x=std::cos(angle)*.82f,y=.34f+std::max(0.0f,-h)*.48f;
-            disc(x,y,.050f,{.83f,.89f,1.0f});
-            disc(x+.023f,y+.012f,.045f,skyTint);
+        if(sunHeight<-.03f){
+            float dx=-std::cos(angle),dy=std::max(.025f,-sunHeight),dz=-.30f;
+            float len=std::sqrt(dx*dx+dy*dy+dz*dz);dx/=len;dy/=len;dz/=len;
+            V3 center=point(dx,dy,dz,0,0,0);
+            disc(center,2.65f,{.88f,.91f,1.0f});
+            V3 cut{center.x+camRight.x*1.05f+camUp.x*.35f,center.y+camRight.y*1.05f+camUp.y*.35f,center.z+camRight.z*1.05f+camUp.z*.35f};
+            disc(cut,2.35f,skyTint);
         }
-        glDisable(GL_DEPTH_TEST);draw(v,GL_TRIANGLES,identity(),0,0,0,false,false);glEnable(GL_DEPTH_TEST);
+        glDisable(GL_DEPTH_TEST);draw(v,GL_TRIANGLES,vp,px,feet+1.62f,pz,false,false);glEnable(GL_DEPTH_TEST);
+    }
+    void spawnBlockEffects(int x,int y,int z,uint8_t id){
+        DroppedItem item{};item.id=id;item.x=x+.5f;item.y=y+.48f;item.z=z+.5f;
+        uint32_t h=terrainHash(x*7+id,y*13+z);
+        item.vx=((int)(h&255)-127)/900.0f;item.vy=2.0f;item.vz=((int)((h>>8)&255)-127)/900.0f;
+        droppedItems.push_back(item);
+        for(int i=0;i<10;i++){
+            uint32_t q=terrainHash(x+i*31+id,y*17+i*7+z);
+            BlockParticle p{};p.id=id;p.x=x+.18f+(q&255)/320.0f;p.y=y+.18f+((q>>8)&255)/320.0f;p.z=z+.18f+((q>>16)&255)/320.0f;
+            p.vx=((int)(q&1023)-511)/420.0f;p.vy=1.0f+((q>>10)&255)/180.0f;p.vz=((int)((q>>18)&1023)-511)/420.0f;p.life=.42f+(i%4)*.10f;
+            blockParticles.push_back(p);
+        }
+    }
+    void updateWorldEffects(float dt){
+        for(auto it=droppedItems.begin();it!=droppedItems.end();){
+            it->age+=dt;it->vy-=12.0f*dt;it->x+=it->vx*dt;it->y+=it->vy*dt;it->z+=it->vz*dt;
+            it->vx*=.985f;it->vz*=.985f;
+            int bx=(int)std::floor(it->x),bz=(int)std::floor(it->z);
+            for(int by=(int)std::floor(it->y);by>=0;--by)if(solid(bx,by,bz)){float floorY=by+1.0f;if(it->y<floorY+.13f){it->y=floorY+.13f;it->vy=it->vy<-.8f?-.16f:0.0f;it->vx*=.72f;it->vz*=.72f;}break;}
+            float dx=it->x-(px),dy=it->y-(feet+.75f),dz=it->z-pz;
+            if(dx*dx+dy*dy+dz*dz<2.25f){if(addItem(it->id,1)){it=droppedItems.erase(it);continue;}}
+            if(it->age>120.0f){it=droppedItems.erase(it);continue;}
+            ++it;
+        }
+        for(auto it=blockParticles.begin();it!=blockParticles.end();){
+            it->life-=dt;it->vy-=8.0f*dt;it->x+=it->vx*dt;it->y+=it->vy*dt;it->z+=it->vz*dt;
+            if(it->life<=0){it=blockParticles.erase(it);continue;}++it;
+        }
+    }
+    void drawWorldEffects(const Mat4&vp){
+        std::vector<float>v;
+        auto cube=[&](float x,float y,float z,float s,V3 color){
+            V3 a{x-s,y-s,z-s},b{x+s,y-s,z-s},c{x+s,y+s,z-s},d{x-s,y+s,z-s};
+            V3 e{x-s,y-s,z+s},f{x+s,y-s,z+s},g{x+s,y+s,z+s},h{x-s,y+s,z+s};
+            addFace(v,a,b,c,d,color);addFace(v,f,e,h,g,color);addFace(v,e,a,d,h,color);addFace(v,b,f,g,c,color);addFace(v,d,c,g,h,color);addFace(v,e,f,b,a,color);
+        };
+        for(const auto&i:droppedItems){float bob=std::sin(animationTime*3.0f+i.age*2.0f)*.045f;cube(i.x,i.y+bob,i.z,.13f,blockColor(i.id,2));}
+        for(const auto&p:blockParticles){float s=.035f*std::clamp(p.life/.5f,.25f,1.0f);cube(p.x,p.y,p.z,s,blockColor(p.id,2));}
+        draw(v,GL_TRIANGLES,vp,px,feet+1.62f,pz,true,false);
     }
     void frame(float dt){
         fpsAccumulator+=dt;fpsFrames++;if(fpsAccumulator>=0.5f){fpsValue=fpsFrames/fpsAccumulator;fpsFrames=0;fpsAccumulator=0;}
         if(!running||!eglMakeCurrent(display,surface,surface,context))return;dt=std::min(dt,.04f);
         if(!inWorld){glViewport(0,0,width,height);glClearColor(.10f,.18f,.25f,1);glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);drawMenu();eglSwapBuffers(display,surface);return;}
         if(playerDead){swallowTimer+=dt;if(swallowTimer>2.8f){playerDead=false;swallowTimer=0;health=10;armor=10;px=0;pz=0;feet=(float)groundHeight(0,0);vy=0;grounded=true;grafikX=6;grafikZ=-5;grafikFeet=(float)groundHeight(6,-5);grafikAlive=true;grafikHealth=2;} }
-        dayClock=std::fmod(dayClock+dt,1200.0f);updateSky();
+        dayClock=std::fmod(dayClock+dt,1200.0f);animationTime+=dt;updateSky();
         if(!playerDead){
         float forward=joyY,side=joyX,mag=std::sqrt(forward*forward+side*side);if(mag>1){forward/=mag;side/=mag;}
         bool swimming=inWater();float speed=swimming?2.8f:5.2f;movePlayer((std::sin(yaw)*forward+std::cos(yaw)*side)*speed*dt,(-std::cos(yaw)*forward+std::sin(yaw)*side)*speed*dt);
@@ -80,16 +153,18 @@
         if(breaking){int tx,ty,tz,ax,ay,az;if(raycast(tx,ty,tz,ax,ay,az)){if(tx!=breakX||ty!=breakY||tz!=breakZ){breakX=tx;breakY=ty;breakZ=tz;breakTimer=0;}auto it=chunks.find(chunkKey(floorDiv(tx,CS),floorDiv(tz,CS)));uint8_t q=it==chunks.end()?0:it->second.get(modp(tx,CS),ty,modp(tz,CS));breakTimer+=dt;if(q&&breakTimer>=breakDuration(q)){editBlock(false);breaking=false;breakTimer=0;}}else breakTimer=0;}
         }
         updateGrafik(dt);
+        updateWorldEffects(dt);
         updateLan(dt);
         if(inWorld){saveTimer+=dt;if(saveTimer>=12.0f){saveWorld();saveTimer=0;}}
         updateWorld();
-        glViewport(0,0,width,height);glClearColor(skyTint.x,skyTint.y,skyTint.z,1);glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);drawSkyDecor();glClear(GL_DEPTH_BUFFER_BIT);
-        Mat4 vp=mul(perspective(1.02f,(float)width/height,.1f,240),camera(px,feet+1.62f,pz,yaw,pitch));
+        glViewport(0,0,width,height);glClearColor(skyTint.x,skyTint.y,skyTint.z,1);glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
+        Mat4 vp=mul(perspective(1.02f,(float)width/height,.1f,240),camera(px,feet+1.62f,pz,yaw,pitch));drawSkyDecor(vp);glClear(GL_DEPTH_BUFFER_BIT);
         for(auto&entry:chunks)draw(entry.second.mesh,GL_TRIANGLES,vp,px,feet+1.62f,pz,true,true);
         std::vector<float> clouds;
         auto cloudCube=[&](float x,float y,float z,float w,float h,float d){V3 a{x,y,z},b{x+w,y,z},c{x+w,y+h,z},dd{x,y+h,z},e{x,y,z+d},ff{x+w,y,z+d},g{x+w,y+h,z+d},hh{x,y+h,z+d};V3 col{.94f,.97f,1.0f};addFace(clouds,a,b,c,dd,col);addFace(clouds,ff,e,hh,g,col);addFace(clouds,e,a,dd,hh,col);addFace(clouds,b,ff,g,c,col);addFace(clouds,dd,c,g,hh,col);addFace(clouds,e,ff,b,a,col);};
         for(int iz=-2;iz<=2;iz++)for(int ix=-2;ix<=2;ix++){float x=std::floor(px/24.0f)*24.0f+ix*24.0f+((ix+iz)&1?5.0f:0.0f),z=std::floor(pz/24.0f)*24.0f+iz*24.0f;float y=19.0f+((ix*3+iz*5)&1)*2.0f;cloudCube(x,y,z,7.0f,1.4f,4.0f);cloudCube(x+3.0f,y+.5f,z-1.0f,5.0f,1.5f,5.0f);cloudCube(x-2.0f,y+.3f,z+1.0f,4.0f,1.2f,3.0f);}
         draw(clouds,GL_TRIANGLES,vp,px,feet+1.62f,pz,true,false);
+        drawWorldEffects(vp);
         if(remoteValid){
             std::vector<float> avatar;
             float rx=remoteX,rz=remoteZ,ry=remoteY;
@@ -135,5 +210,9 @@
             for(int i=0;i<24;i+=2){for(int j:{e[i],e[i+1]})edge.insert(edge.end(),{p[j].x,p[j].y,p[j].z,white.x,white.y,white.z,0,0});}
             glDisable(GL_CULL_FACE);draw(edge,GL_LINES,vp,px,feet+1.62f,pz,true);
         }
-        if(inventoryOpen)drawInventory();else drawHud();eglSwapBuffers(display,surface);
+        if(inventoryOpen)drawInventory();else drawHud();
+        int gameMinutes=(int)(dayClock/1200.0f*1440.0f)%1440;
+        std::string clockText=(gameMinutes/60<10?"0":"")+std::to_string(gameMinutes/60)+":"+(gameMinutes%60<10?"0":"")+std::to_string(gameMinutes%60);
+        drawText(clockText,-.045f,.91f,.010f,{1,1,1});
+        eglSwapBuffers(display,surface);
     }

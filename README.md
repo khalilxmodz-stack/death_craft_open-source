@@ -8,7 +8,9 @@ Native Android voxel sandbox built with **C++20**, Android NDK, CMake, and OpenG
 - Creative and Survival modes, flat and normal world types, and three save slots.
 - Health and armor displayed as bars only.
 - Classic pixel-style tree foliage texture at `app/src/main/assets/textures/grass_tree_texture.png`.
-- A complete 20-minute day/night cycle (10 minutes daylight and 10 minutes night), with a moving sun, crescent moon, and stars.
+- A complete 20-minute day/night cycle (10 minutes daylight and 10 minutes night), with a fixed-world sun, moon, and yellow stars that disappear in daylight.
+- A small in-game digital clock, black nighttime sky, and slow animated water surface.
+- Block-breaking particle bursts, physical dropped block items, and automatic pickup at close range.
 - Player name, FPS counter, hotbar, inventory, and LAN host/join prototype.
 - World fog and view distance tuned for mobile rendering.
 
@@ -31,7 +33,7 @@ Native Android voxel sandbox built with **C++20**, Android NDK, CMake, and OpenG
 - `systems/inventory.inc`: inventory and crafting.
 - `systems/chunk_render.inc`: chunk meshes, rendering, and HUD.
 - `systems/player.inc`: movement, collision, targeting, and block editing.
-- `systems/world_update.inc`: simulation, day/night cycle, sky, and frame update.
+- `systems/world_update.inc`: simulation, day/night cycle, world-space sky, dropped items, block particles, and frame update.
 - `systems/menu.inc`: main menu layout and name-entry screen.
 - `app/src/main/assets/textures/`: block, foliage, sky, and control textures.
 - `stb_image.h`: image decoder.
