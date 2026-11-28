@@ -1,3 +1,6 @@
+// Subsystem: Chunk mesh generation, OpenGL submission, HUD, inventory, and text rendering.
+// Function comments describe each method's responsibility and its place in the game systems.
+
     void rebuild(Chunk&c){
         c.mesh.clear();c.shadowMesh.clear();int ox=c.cx*CS,oz=c.cz*CS;
         auto localSolid=[&](int x,int y,int z){
