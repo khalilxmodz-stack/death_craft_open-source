@@ -2,12 +2,11 @@
     // Function comments describe each method's responsibility and its place in the game systems.
 
     // Returns the terrain surface height, respecting flat-world mode.
-    int groundHeight(int x, int z) const {
+    int x, int z) const {
         return flatWorld ? 8 : terrainHeight(x, z);
     }
     // Checks whether the player's body intersects a water block.
-    // Looks up a block at world coordinates, including generated chunks.
-    bool inWater() const {
+    ) const {
         int x = (int)std::floor(px), z = (int)std::floor(pz);
         for (int y = (int)std::floor(feet + .15f); y <= (int)std::floor(feet + 1.65f); y++)
             if (blockAt(x, y, z) == 9)
@@ -15,11 +14,11 @@
         return false;
     }
     // Builds the save-file path for the selected world slot.
-    std::string savePath() const {
+    ) const {
         return saveDirectory + "/deathcraft_world_" + std::to_string(selectedSlot) + ".dat";
     }
     // Writes the current player name to app storage.
-    void savePlayerName() const {
+    ) const {
         if (saveDirectory.empty())
             return;
         std::ofstream out(saveDirectory + "/deathcraft_player_name.txt", std::ios::trunc);
@@ -27,7 +26,7 @@
             out << playerName;
     }
     // Loads and validates the saved player name.
-    void loadPlayerName() {
+    ) {
         if (saveDirectory.empty())
             return;
         std::ifstream in(saveDirectory + "/deathcraft_player_name.txt");
@@ -39,7 +38,7 @@
         }
     }
     // Serializes world settings, player state, and edited blocks to disk.
-    void saveWorld() {
+    ) {
         if (!inWorld || saveDirectory.empty())
             return;
         std::ofstream out(savePath(), std::ios::binary | std::ios::trunc);
@@ -78,7 +77,7 @@
         }
     }
     // Restores a saved world and its persisted player and block data.
-    bool loadWorld() {
+    ) {
         std::ifstream in(savePath(), std::ios::binary);
         if (!in)
             return false;
@@ -134,7 +133,7 @@
         return true;
     }
     // Switches between the supported player game modes.
-    void cycleGameMode() {
+    ) {
         if (!creativeMode && !spectatorMode) {
             creativeMode = true;
             spectatorMode = false;
@@ -155,7 +154,7 @@
         statusFrames = 90;
     }
     // Initializes a new world or loads the selected saved world.
-    void startWorld() {
+    ) {
         for (auto& entry : chunks)
             if (entry.second.meshVbo)
                 glDeleteBuffers(1, &entry.second.meshVbo);
@@ -262,13 +261,14 @@
         status = loaded ? "WORLD LOADED" : "WORLD CREATED";
         statusFrames = 120;
     }
-    uint8_t blockAt(int x, int y, int z) const {
+    // Looks up a block at world coordinates, including generated chunks.
+    int x, int y, int z) const {
         int cx = floorDiv(x, CS), cz = floorDiv(z, CS);
         auto it = chunks.find(chunkKey(cx, cz));
         return it == chunks.end() ? 0 : it->second.get(modp(x, CS), y, modp(z, CS));
     }
     // Adds one textured block face to a mesh vertex buffer.
-    void addBlockFace(std::vector<float>& v,
+    std::vector<float>& v,
                       V3 a,
                       V3 b,
                       V3 c,
@@ -313,7 +313,7 @@
         addTri(v, a, c, d, color, u0, v0, u1, v1, u0, v1);
     }
     // Determines whether a block obstructs player or mob movement.
-    bool solid(int x, int y, int z) {
+    int x, int y, int z) {
         int cx = floorDiv(x, CS), cz = floorDiv(z, CS);
         auto it = chunks.find(chunkKey(cx, cz));
         if (it == chunks.end())
@@ -322,7 +322,7 @@
         return b != 0 && b != 9;
     }
     // Finds a nearby walkable surface for a moving mob.
-    float mobSurfaceHeight(float x, float z, float referenceFeet) {
+    float x, float z, float referenceFeet) {
         int bx = (int)std::floor(x), bz = (int)std::floor(z);
         int top = std::min(HEIGHT - 2, (int)std::floor(referenceFeet) + 1);
         int bottom = std::max(0, (int)std::floor(referenceFeet) - 2);
@@ -332,7 +332,7 @@
         return -1000.0f;
     }
     // Checks whether a mob can occupy a candidate position.
-    bool mobCanStandAt(float x, float feetY, float z, float radius, float bodyHeight) {
+    float x, float feetY, float z, float radius, float bodyHeight) {
         int minY = (int)std::floor(feetY + .04f), maxY = (int)std::floor(feetY + bodyHeight - .04f);
         const float offsets[3] = {-radius, 0.0f, radius};
         for (int yi = minY; yi <= maxY; yi++)
@@ -343,7 +343,7 @@
         return true;
     }
     // Attempts to move a mob up a small ledge without collision.
-    bool mobTryStep(
+    
         float x, float z, float oldFeet, float radius, float bodyHeight, float& newFeet) {
         float surface = mobSurfaceHeight(x, z, oldFeet);
         if (surface < 0.0f || std::abs(surface - oldFeet) > 1.05f)
@@ -354,7 +354,7 @@
         return true;
     }
     // Moves a mob while following terrain and avoiding solid blocks.
-    void moveMobOnBlocks(
+    
         float& x, float& z, float& feetY, float nx, float nz, float radius, float bodyHeight) {
         float nextFeet = feetY;
         if (mobTryStep(nx, nz, feetY, radius, bodyHeight, nextFeet)) {
@@ -373,7 +373,7 @@
         }
     }
     // Queues a chunk for mesh rebuilding after its contents change.
-    void markChunkDirty(int cx, int cz) {
+    int cx, int cz) {
         auto it = chunks.find(chunkKey(cx, cz));
         if (it == chunks.end())
             return;
@@ -383,7 +383,7 @@
         }
     }
     // Marks the affected chunk and neighboring chunk edges for refresh.
-    void markBlockDirty(int x, int y, int z) {
+    int x, int y, int z) {
         (void)y;
         const int cx = floorDiv(x, CS), cz = floorDiv(z, CS), lx = modp(x, CS), lz = modp(z, CS);
         markChunkDirty(cx, cz);
@@ -405,7 +405,7 @@
             markChunkDirty(cx + 1, cz + 1);
     }
     // Generates terrain and natural features for one chunk.
-    void generate(Chunk& c) {
+    Chunk& c) {
         int ox = c.cx * CS, oz = c.cz * CS;
         for (int z = 0; z < CS; z++)
             for (int x = 0; x < CS; x++) {
@@ -573,7 +573,6 @@
         }
         c.dirty = true;
     }
-    // Returns an existing chunk or generates it when missing.
     Chunk& ensureChunk(int cx, int cz) {
         uint64_t k = chunkKey(cx, cz);
         auto it = chunks.find(k);
@@ -588,7 +587,7 @@
         return it->second;
     }
     // Returns the fallback display color associated with a block ID.
-    V3 blockColor(uint8_t b, int face) {
+    uint8_t b, int face) {
         if (b == 19)
             return {.12f, .12f, .14f};
         if (b == 9)
@@ -621,7 +620,7 @@
         return {.72f, .62f, .35f};
     }
     // Calculates mining time from the selected tool and target block.
-    float breakDuration(uint8_t b) const {
+    uint8_t b) const {
         uint8_t tool =
             selected >= 0 && selected < (int)inventory.size() && inventory[selected].count > 0
                 ? inventory[selected].id
