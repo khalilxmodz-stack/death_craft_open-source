@@ -36,6 +36,7 @@
                 }
             }
             else if(p.type==7&&lanMode==2){if(p.flags&1){grafikHealth=p.block;grafikAlive=grafikHealth>0;grafikHitTimer=.28f;}else{khalilHealth=p.block;khalilAlive=khalilHealth>0;khalilHitTimer=.28f;}}
+            else if(p.type==10&&lanMode==2){grafikX=p.x;grafikFeet=p.y;grafikZ=p.z;grafikAlive=(p.flags&1)!=0;grafikHitTimer=(p.flags&2)?.24f:0;grafikHealth=p.block;}
             else if(p.type==8){DroppedItem item{};item.id=p.block;item.count=std::max(1,(int)p.flags);item.x=p.x;item.y=p.y;item.z=p.z;droppedItems.push_back(item);}
             else if(p.type==9){for(auto it=droppedItems.begin();it!=droppedItems.end();){float dx=it->x-p.x,dy=it->y-p.y,dz=it->z-p.z;if(dx*dx+dy*dy+dz*dz<.36f&&it->id==p.block){it=droppedItems.erase(it);break;}++it;}}
             else if(p.type==5&&lanMode==2){
@@ -48,7 +49,7 @@
         lanTimer+=dt;helloTimer+=dt;remoteTimer+=dt;
         if(lanTimer>=.10f){lanTimer=0;LanPacket state{};state.type=2;state.player=networkId;state.x=px;state.y=feet;state.z=pz;state.yaw=yaw;std::strncpy(state.name,playerName.c_str(),sizeof(state.name)-1);sendLan(state);}
         if(lanMode==2&&helloTimer>=.50f){helloTimer=0;LanPacket hello{};hello.type=1;hello.player=networkId;sendLan(hello);}
-        if(lanMode==1&&lanTimer==0.0f){LanPacket monster{};monster.type=4;monster.player=networkId;monster.x=khalilX;monster.y=khalilFeet;monster.z=khalilZ;monster.flags=(khalilAlive?1:0)|(khalilPrimed?2:0)|(khalilHitTimer>0?4:0);monster.block=(uint8_t)std::clamp(khalilHealth,0,255);sendLan(monster);}
+        if(lanMode==1&&lanTimer==0.0f){LanPacket monster{};monster.type=4;monster.player=networkId;monster.x=khalilX;monster.y=khalilFeet;monster.z=khalilZ;monster.flags=(khalilAlive?1:0)|(khalilPrimed?2:0)|(khalilHitTimer>0?4:0);monster.block=(uint8_t)std::clamp(khalilHealth,0,255);sendLan(monster);LanPacket grafik{};grafik.type=10;grafik.player=networkId;grafik.x=grafikX;grafik.y=grafikFeet;grafik.z=grafikZ;grafik.flags=(grafikAlive?1:0)|(grafikHitTimer>0?2:0);grafik.block=(uint8_t)std::clamp(grafikHealth,0,255);sendLan(grafik);}
         if(remoteTimer>3.0f)remoteValid=false;
     }
 
