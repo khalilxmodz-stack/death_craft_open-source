@@ -297,16 +297,42 @@
             if(it->life<=0){it=blockParticles.erase(it);continue;}++it;
         }
     }
-    void drawWorldEffects(const Mat4&vp){
-        std::vector<float>v;
-        auto cube=[&](float x,float y,float z,float s,V3 color){
-            V3 a{x-s,y-s,z-s},b{x+s,y-s,z-s},c{x+s,y+s,z-s},d{x-s,y+s,z-s};
-            V3 e{x-s,y-s,z+s},f{x+s,y-s,z+s},g{x+s,y+s,z+s},h{x-s,y+s,z+s};
-            addFace(v,a,b,c,d,color);addFace(v,f,e,h,g,color);addFace(v,e,a,d,h,color);addFace(v,b,f,g,c,color);addFace(v,d,c,g,h,color);addFace(v,e,f,b,a,color);
+    // Render dropped items and block particles with their atlas textures.
+    void drawWorldEffects(const Mat4& vp) {
+        std::vector<float> vertices;
+
+        auto texturedCube = [&](float x, float y, float z, float size, uint8_t itemId) {
+            const float x0 = x - size;
+            const float x1 = x + size;
+            const float y0 = y - size;
+            const float y1 = y + size;
+            const float z0 = z - size;
+            const float z1 = z + size;
+
+            const V3 a{x0, y0, z0}, b{x1, y0, z0};
+            const V3 c{x1, y1, z0}, d{x0, y1, z0};
+            const V3 e{x0, y0, z1}, f{x1, y0, z1};
+            const V3 g{x1, y1, z1}, h{x0, y1, z1};
+
+            addBlockFace(vertices, a, b, c, d, itemId, 0, 0, 0, 0);
+            addBlockFace(vertices, f, e, h, g, itemId, 1, 0, 0, 0);
+            addBlockFace(vertices, d, c, g, h, itemId, 2, 0, 0, 0);
+            addBlockFace(vertices, e, f, b, a, itemId, 3, 0, 0, 0);
+            addBlockFace(vertices, e, a, d, h, itemId, 4, 0, 0, 0);
+            addBlockFace(vertices, b, f, g, c, itemId, 5, 0, 0, 0);
         };
-        for(const auto&i:droppedItems){float bob=std::sin(animationTime*3.0f+i.age*2.0f)*.045f;cube(i.x,i.y+bob,i.z,.13f,blockColor(i.id,2));}
-        for(const auto&p:blockParticles){float s=.035f*std::clamp(p.life/.5f,.25f,1.0f);cube(p.x,p.y,p.z,s,blockColor(p.id,2));}
-        draw(v,GL_TRIANGLES,vp,px,feet+1.62f,pz,true,false);
+
+        for (const auto& item : droppedItems) {
+            const float bob = std::sin(animationTime * 3.0f + item.age * 2.0f) * 0.045f;
+            texturedCube(item.x, item.y + bob, item.z, 0.13f, item.id);
+        }
+
+        for (const auto& particle : blockParticles) {
+            const float size = 0.035f * std::clamp(particle.life / 0.5f, 0.25f, 1.0f);
+            texturedCube(particle.x, particle.y, particle.z, size, particle.id);
+        }
+
+        draw(vertices, GL_TRIANGLES, vp, px, feet + 1.62f, pz, true, true);
     }
 
     void updateTnt(float dt){

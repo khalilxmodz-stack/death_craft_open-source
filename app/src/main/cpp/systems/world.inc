@@ -53,16 +53,37 @@
         return it==chunks.end()?0:it->second.get(modp(x,CS),y,modp(z,CS));
     }
     void addBlockFace(std::vector<float>&v,V3 a,V3 b,V3 c,V3 d,uint8_t block,int face,int gx,int gy,int gz,float blockLight=-1.0f){
-        int tile=block==11?6:(block==10?5:(block==9?4:(block==3?2:(block==5?3:(block==4?7:(block==13?8:(block==14?9:(block==8?10:((block==1&&face==2)?0:1)))))))));
+        // Map world blocks and dropped inventory items to atlas layers.
+        int tile = 1;
+        if (block == 1 && face == 2) tile = 0;
+        else if (block == 3) tile = 2;
+        else if (block == 5 || (block >= 24 && block <= 28)) tile = 3;
+        else if (block == 9) tile = 4;
+        else if (block == 10) tile = 5;
+        else if (block == 11) tile = 6;
+        else if (block == 4 || block == 6 || block == 15 || block == 16) tile = 7;
+        else if (block == 13 || block == 17 || block == 12) tile = 8;
+        else if (block == 14 || block == 18) tile = 9;
+        else if (block == 8) tile = 10;
+        else if (block == 7) tile = 11;
         float u0=(tile+.012f)/12.0f,u1=(tile+.988f)/12.0f,v0=.012f,v1=.988f;
         const float shade[6]={.78f,.86f,1.0f,.62f,.70f,.78f};
         float light=shade[face]*(blockLight>=0.0f?blockLight:1.0f);V3 color=block==18?V3{light,.20f*light,.24f*light}:((block==10||block==13||block==14||block==8)?V3{light,light,light}:(block==9?V3{.22f*light,.52f*light,.88f*light}:V3{light,light,light}));
         addTri(v,a,b,c,color,u0,v0,u1,v0,u1,v1);addTri(v,a,c,d,color,u0,v0,u1,v1,u0,v1);
     }
-    bool solid(int x,int y,int z){
-        int cx=floorDiv(x,CS),cz=floorDiv(z,CS);auto it=chunks.find(chunkKey(cx,cz));
-        if(it==chunks.end())return y<0;
-        uint8_t b=it->second.get(modp(x,CS),y,modp(z,CS));return b!=0&&b!=9;
+    // Plants are decorative: players and mobs can walk through them.
+    bool solid(int x, int y, int z) {
+        const int cx = floorDiv(x, CS);
+        const int cz = floorDiv(z, CS);
+        const auto it = chunks.find(chunkKey(cx, cz));
+
+        if (it == chunks.end()) {
+            return y < 0;
+        }
+
+        const uint8_t block = it->second.get(modp(x, CS), y, modp(z, CS));
+        const bool isPlant = block >= 24 && block <= 28;
+        return block != 0 && block != 9 && !isPlant;
     }
     float mobSurfaceHeight(float x,float z,float referenceFeet){
         int bx=(int)std::floor(x),bz=(int)std::floor(z);
