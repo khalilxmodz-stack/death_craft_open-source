@@ -2,7 +2,7 @@
     // Function comments describe each method's responsibility and its place in the game systems.
 
     // Builds the visible mesh and shadow mesh for a chunk.
-    void rebuild(Chunk& c) {
+    Chunk& c) {
         c.mesh.clear();
         c.shadowMesh.clear();
         int ox = c.cx * CS, oz = c.cz * CS;
@@ -289,7 +289,7 @@
         c.dirty = false;
     }
     // Submits a chunk's cached mesh to the graphics pipeline.
-    void drawChunk(const Chunk& c, const Mat4& m, float cx, float cy, float cz) {
+    const Chunk& c, const Mat4& m, float cx, float cy, float cz) {
         if (!c.meshVbo || c.meshVertexCount <= 0)
             return;
         glUseProgram(program);
@@ -318,7 +318,7 @@
         glDrawArrays(GL_TRIANGLES, 0, c.meshVertexCount);
     }
     // Uploads and draws a vertex buffer with the requested render state.
-    void draw(const std::vector<float>& v,
+    const std::vector<float>& v,
               GLenum mode,
               const Mat4& m,
               float cx = 0,
@@ -357,7 +357,7 @@
         glDrawArrays(mode, 0, (GLsizei)(v.size() / 8));
     }
     // Renders a textured inventory icon for a block or item ID.
-    void drawBlockIcon(uint8_t id, float x, float y, float w, float h) {
+    uint8_t id, float x, float y, float w, float h) {
         std::vector<float> icon;
         V3 white{1, 1, 1};
         if (id == 15 || id == 16) {
@@ -539,7 +539,7 @@
         draw(icon, GL_TRIANGLES, identity(), 0, 0, 0, false, true, 0, false);
     }
     // Renders the in-game heads-up display and touch controls.
-    void drawHud() {
+    ) {
         glDisable(GL_DEPTH_TEST);
         Mat4 m = identity();
         std::vector<float> v;
@@ -692,7 +692,7 @@
         glEnable(GL_DEPTH_TEST);
     }
     // Renders inventory slots, item icons, and crafting controls.
-    void drawInventory() {
+    ) {
         glDisable(GL_DEPTH_TEST);
         std::vector<float> v;
         auto r = [&](float x, float y, float w, float h, V3 c) {
@@ -746,7 +746,6 @@
         drawText("X", .66f, .62f, .025f, {1, 1, 1});
         glEnable(GL_DEPTH_TEST);
     }
-    // Maps a supported character to its bitmap-font glyph data.
     std::array<uint8_t, 7> glyph(char c) {
         switch (c) {
             case 'A':
@@ -823,7 +822,8 @@
                 return {0, 0, 0, 0, 0, 0, 0};
         }
     }
-    void drawText(const std::string& str, float x, float y, float scale, V3 color) {
+    // Renders a string using the game's bitmap font.
+    const std::string& str, float x, float y, float scale, V3 color) {
         if (str.empty())
             return;
         const float maxWidth = 1.72f;
