@@ -304,7 +304,7 @@
         for(auto it=primedTnts.begin();it!=primedTnts.end();){
             it->fuse-=dt;
             if(it->fuse>0.0f){++it;continue;}
-            explosionX=it->x;explosionY=it->y;explosionZ=it->z;explosionEffectTimer=.62f;
+            explosionX=it->x;explosionY=it->y;explosionZ=it->z;explosionEffectTimer=.62f;playSound(2);
             const int radius=4;
             for(int bz=(int)std::floor(it->z)-radius;bz<=(int)std::floor(it->z)+radius;bz++)
             for(int by=std::max(0,(int)std::floor(it->y)-radius);by<=std::min(HEIGHT-1,(int)std::floor(it->y)+radius);by++)
@@ -460,7 +460,8 @@
         nightActive=nightNow;
         if(!playerDead){
         float forward=joyY,side=joyX,mag=std::sqrt(forward*forward+side*side);if(mag>1){forward/=mag;side/=mag;}
-        bool swimming=inWater();float speed=swimming?2.8f:5.2f;if(!spectatorMode)movePlayer((std::sin(yaw)*forward+std::cos(yaw)*side)*speed*dt,(-std::cos(yaw)*forward+std::sin(yaw)*side)*speed*dt);else{px+=(std::sin(yaw)*forward+std::cos(yaw)*side)*8.0f*dt;pz+=(-std::cos(yaw)*forward+std::sin(yaw)*side)*8.0f*dt;}
+        bool swimming=inWater();float speed=swimming?2.8f:5.2f;
+        bool walkingInput=mag>.12f;footstepTimer-=dt;if(walkingInput&&grounded&&!swimming&&footstepTimer<=0){playSound(1);footstepTimer=.43f;}if(!spectatorMode)movePlayer((std::sin(yaw)*forward+std::cos(yaw)*side)*speed*dt,(-std::cos(yaw)*forward+std::sin(yaw)*side)*speed*dt);else{px+=(std::sin(yaw)*forward+std::cos(yaw)*side)*8.0f*dt;pz+=(-std::cos(yaw)*forward+std::sin(yaw)*side)*8.0f*dt;}
         if(spectatorMode){vy=0;grounded=false;fallTracking=false;}else if(swimming){grounded=false;fallTracking=false;vy-=2.0f*dt;if(feet+1.2f<SEA_LEVEL)vy+=5.0f*dt;vy*=.94f;vy=std::clamp(vy,-2.0f,3.0f);feet+=vy*dt;}
         else {if(grounded&&!supported()){grounded=false;fallStartFeet=feet;fallPeakFeet=feet;fallTracking=true;}}
         if(!spectatorMode&&!grounded&&!swimming){fallPeakFeet=std::max(fallPeakFeet,feet);vy-=22*dt;float next=feet+vy*dt;if(vy<=0){int bx=(int)std::floor(px),bz=(int)std::floor(pz),by=(int)std::floor(next-.01f);
