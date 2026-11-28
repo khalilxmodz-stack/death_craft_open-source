@@ -78,6 +78,11 @@
         }
         glDisable(GL_DEPTH_TEST);draw(v,GL_TRIANGLES,vp,px,feet+1.62f,pz,false,false);glEnable(GL_DEPTH_TEST);
     }
+    void spawnDroppedItem(uint8_t id,float x,float y,float z){
+        if(!id)return;
+        DroppedItem item{};item.id=id;item.x=x;item.y=y;item.z=z;item.vx=std::sin(yaw)*.9f;item.vy=1.6f;item.vz=-std::cos(yaw)*.9f;droppedItems.push_back(item);
+        if(lanMode){LanPacket packet{};packet.type=8;packet.player=networkId;packet.block=id;packet.x=x;packet.y=y;packet.z=z;sendLan(packet);}
+    }
     void spawnBlockEffects(int x,int y,int z,uint8_t id){
         DroppedItem item{};item.id=id;item.x=x+.5f;item.y=y+.48f;item.z=z+.5f;
         uint32_t h=terrainHash(x*7+id,y*13+z);
@@ -97,7 +102,7 @@
             int bx=(int)std::floor(it->x),bz=(int)std::floor(it->z);
             for(int by=(int)std::floor(it->y);by>=0;--by)if(solid(bx,by,bz)){float floorY=by+1.0f;if(it->y<floorY+.13f){it->y=floorY+.13f;it->vy=it->vy<-.8f?-.16f:0.0f;it->vx*=.72f;it->vz*=.72f;}break;}
             float dx=it->x-(px),dy=it->y-(feet+.75f),dz=it->z-pz;
-            if(dx*dx+dy*dy+dz*dz<2.25f){if(addItem(it->id,1)){it=droppedItems.erase(it);continue;}}
+            if(dx*dx+dy*dy+dz*dz<2.25f){if(addItem(it->id,1)){if(lanMode){LanPacket packet{};packet.type=9;packet.player=networkId;packet.block=it->id;packet.x=it->x;packet.y=it->y;packet.z=it->z;sendLan(packet);}it=droppedItems.erase(it);continue;}}
             if(it->age>120.0f){it=droppedItems.erase(it);continue;}
             ++it;
         }
@@ -148,6 +153,7 @@
         }
     }
     void updateKhalil(float dt){
+        khalilHitTimer=std::max(0.0f,khalilHitTimer-dt);
         if(explosionEffectTimer>0)explosionEffectTimer=std::max(0.0f,explosionEffectTimer-dt);
         if(lanMode==2)return;
         if(!khalilAlive){
@@ -156,7 +162,7 @@
                 float angle=(float)(terrainHash((int)px+(int)animationTime,(int)pz)&0xffff)/65535.0f*2.0f*PI;
                 khalilX=px+std::cos(angle)*10.0f;khalilZ=pz+std::sin(angle)*10.0f;
                 khalilFeet=(float)groundHeight((int)std::floor(khalilX),(int)std::floor(khalilZ));
-                khalilAlive=true;khalilPrimed=false;khalilFuse=0;khalilRespawn=0;
+                khalilAlive=true;khalilHealth=8;khalilHitTimer=0;khalilPrimed=false;khalilFuse=0;khalilRespawn=0;
             }
             return;
         }
@@ -200,8 +206,9 @@
                     V3 p0=point(a0,b0),p1=point(a0,b1),p2=point(a1,b1),p3=point(a1,b0);
                     float u0=(float)ix/longitudes,u1=(float)(ix+1)/longitudes;
                     float v0=(float)iy/latitudes,v1=(float)(iy+1)/latitudes;
-                    addTri(sphere,p0,p1,p2,{1,1,1},u0,v0,u1,v0,u1,v1);
-                    addTri(sphere,p0,p2,p3,{1,1,1},u0,v0,u1,v1,u0,v1);
+                    V3 tint=khalilHitTimer>0?V3{1.0f,.12f,.12f}:V3{1,1,1};
+                    addTri(sphere,p0,p1,p2,tint,u0,v0,u1,v0,u1,v1);
+                    addTri(sphere,p0,p2,p3,tint,u0,v0,u1,v1,u0,v1);
                 }
             }
             float pulse=khalilPrimed?.72f+.28f*std::sin(animationTime*18.0f):1.0f;
@@ -310,7 +317,7 @@
         }
         if(grafikAlive){
             std::vector<float> sphere;auto point=[&](float lat,float lon){return V3{grafikX+.58f*std::cos(lat)*std::sin(lon),grafikFeet+.62f+.58f*std::sin(lat),grafikZ+.58f*std::cos(lat)*std::cos(lon)};};
-            for(int iy=0;iy<10;iy++){float a0=-PI*.5f+PI*iy/10.0f,a1=-PI*.5f+PI*(iy+1)/10.0f;for(int ix=0;ix<16;ix++){float b0=2*PI*ix/16.0f,b1=2*PI*(ix+1)/16.0f;V3 p0=point(a0,b0),p1=point(a0,b1),p2=point(a1,b1),p3=point(a1,b0);float shade=.72f+.28f*std::max(0.0f,std::sin((a0+a1)*.5f));V3 c{.48f*shade,.12f*shade,.68f*shade};addTri(sphere,p0,p1,p2,c);addTri(sphere,p0,p2,p3,c);}}
+            for(int iy=0;iy<10;iy++){float a0=-PI*.5f+PI*iy/10.0f,a1=-PI*.5f+PI*(iy+1)/10.0f;for(int ix=0;ix<16;ix++){float b0=2*PI*ix/16.0f,b1=2*PI*(ix+1)/16.0f;V3 p0=point(a0,b0),p1=point(a0,b1),p2=point(a1,b1),p3=point(a1,b0);float shade=.72f+.28f*std::max(0.0f,std::sin((a0+a1)*.5f));V3 c=grafikHitTimer>0?V3{1.0f,.06f,.06f}:V3{.48f*shade,.12f*shade,.68f*shade};addTri(sphere,p0,p1,p2,c);addTri(sphere,p0,p2,p3,c);}}
             draw(sphere,GL_TRIANGLES,vp,px,feet+1.62f,pz,true,false);
         }
         // Target outline around the block under the crosshair.
