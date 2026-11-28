@@ -118,6 +118,35 @@
         draw(v,GL_TRIANGLES,vp,px,feet+1.62f,pz,true,false);
     }
 
+    void updateTnt(float dt){
+        for(auto it=primedTnts.begin();it!=primedTnts.end();){
+            it->fuse-=dt;
+            if(it->fuse>0.0f){++it;continue;}
+            explosionX=it->x;explosionY=it->y;explosionZ=it->z;explosionEffectTimer=.62f;
+            const int radius=4;
+            for(int bz=(int)std::floor(it->z)-radius;bz<=(int)std::floor(it->z)+radius;bz++)
+            for(int by=std::max(0,(int)std::floor(it->y)-radius);by<=std::min(HEIGHT-1,(int)std::floor(it->y)+radius);by++)
+            for(int bx=(int)std::floor(it->x)-radius;bx<=(int)std::floor(it->x)+radius;bx++){
+                float dx=bx+.5f-it->x,dy=by+.5f-it->y,dz=bz+.5f-it->z;
+                if(dx*dx+dy*dy+dz*dz>12.25f)continue;
+                uint8_t block=blockAt(bx,by,bz);if(!block)continue;
+                Chunk&chunk=ensureChunk(floorDiv(bx,CS),floorDiv(bz,CS));
+                chunk.set(modp(bx,CS),by,modp(bz,CS),0);edits[{bx,by,bz}]=0;
+                if(lanMode==1){LanPacket packet{};packet.type=3;packet.player=networkId;packet.bx=bx;packet.by=by;packet.bz=bz;packet.block=0;sendLan(packet);}
+            }
+            float dx=px-it->x,dy=feet+.85f-it->y,dz=pz-it->z;
+            float distance=std::sqrt(dx*dx+dy*dy+dz*dz);
+            if(distance<4.5f&&!creativeMode){
+                int damage=distance<2.0f?10:(distance<3.3f?6:3);
+                int absorbed=std::min(armor,damage);armor-=absorbed;damage-=absorbed;
+                health=std::max(0,health-damage);status="TNT EXPLOSION!";statusFrames=120;
+                if(health<=0){playerDead=true;swallowTimer=.001f;deathMessage="KILLED BY TNT";}
+            }else{status="TNT EXPLODED";statusFrames=100;}
+            if(lanMode==1){LanPacket event{};event.type=5;event.player=networkId;event.x=explosionX;event.y=explosionY;event.z=explosionZ;sendLan(event);}
+            for(auto&entry:chunks)entry.second.dirty=true;
+            it=primedTnts.erase(it);
+        }
+    }
     void updateKhalil(float dt){
         if(explosionEffectTimer>0)explosionEffectTimer=std::max(0.0f,explosionEffectTimer-dt);
         if(lanMode==2)return;
@@ -133,20 +162,20 @@
         }
         if(playerDead)return;
         float dx=px-khalilX,dz=pz-khalilZ,dist=std::sqrt(dx*dx+dz*dz);
-        if(dist>28.0f){
+        if(dist>36.0f){
             float angle=(float)(terrainHash((int)px+17,(int)pz-29)&0xffff)/65535.0f*2.0f*PI;
             khalilX=px-std::cos(angle)*10.0f;khalilZ=pz-std::sin(angle)*10.0f;
             khalilFeet=(float)groundHeight((int)std::floor(khalilX),(int)std::floor(khalilZ));
             dx=px-khalilX;dz=pz-khalilZ;dist=std::sqrt(dx*dx+dz*dz);
         }
         if(dist>2.15f){
-            float step=std::min(2.15f*dt,dist-1.55f);
+            float step=std::min(3.15f*dt,dist-1.35f);
             float nx=khalilX+dx/dist*step,nz=khalilZ+dz/dist*step;
             int gh=groundHeight((int)std::floor(nx),(int)std::floor(nz));
             if(std::abs((float)gh-khalilFeet)<=1.1f){khalilX=nx;khalilZ=nz;khalilFeet=(float)gh;}
         }
-        if(dist<2.35f){khalilPrimed=true;khalilFuse+=dt;}
-        if(khalilPrimed&&khalilFuse>=1.35f){
+        if(dist<2.65f){khalilPrimed=true;khalilFuse+=dt;}
+        if(khalilPrimed&&khalilFuse>=1.0f){
             explosionX=khalilX;explosionY=khalilFeet+.75f;explosionZ=khalilZ;explosionEffectTimer=.62f;
             float pdx=px-explosionX,pdy=feet+0.85f-explosionY,pdz=pz-explosionZ;
             float blastDistance=std::sqrt(pdx*pdx+pdy*pdy+pdz*pdz);
@@ -234,16 +263,17 @@
         }
         updateGrafik(dt);
         updateKhalil(dt);
+        updateTnt(dt);
         updateWorldEffects(dt);
         updateLan(dt);
         if(inWorld){saveTimer+=dt;if(saveTimer>=12.0f){saveWorld();saveTimer=0;}}
         updateWorld();
         glViewport(0,0,width,height);glClearColor(skyTint.x,skyTint.y,skyTint.z,1);glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
-        Mat4 vp=mul(perspective(1.02f,(float)width/height,.1f,240),camera(px,feet+1.62f,pz,yaw,pitch));drawSkyDecor(vp);glClear(GL_DEPTH_BUFFER_BIT);
+        Mat4 vp=mul(perspective(1.02f,(float)width/height,.1f,320),camera(px,feet+1.62f,pz,yaw,pitch));drawSkyDecor(vp);glClear(GL_DEPTH_BUFFER_BIT);
         for(auto&entry:chunks)draw(entry.second.mesh,GL_TRIANGLES,vp,px,feet+1.62f,pz,true,true);
         std::vector<float> clouds;
         auto cloudCube=[&](float x,float y,float z,float w,float h,float d){V3 a{x,y,z},b{x+w,y,z},c{x+w,y+h,z},dd{x,y+h,z},e{x,y,z+d},ff{x+w,y,z+d},g{x+w,y+h,z+d},hh{x,y+h,z+d};V3 col{.94f,.97f,1.0f};addFace(clouds,a,b,c,dd,col);addFace(clouds,ff,e,hh,g,col);addFace(clouds,e,a,dd,hh,col);addFace(clouds,b,ff,g,c,col);addFace(clouds,dd,c,g,hh,col);addFace(clouds,e,ff,b,a,col);};
-        for(int iz=-2;iz<=2;iz++)for(int ix=-2;ix<=2;ix++){float x=std::floor(px/24.0f)*24.0f+ix*24.0f+((ix+iz)&1?5.0f:0.0f),z=std::floor(pz/24.0f)*24.0f+iz*24.0f;float y=19.0f+((ix*3+iz*5)&1)*2.0f;cloudCube(x,y,z,7.0f,1.4f,4.0f);cloudCube(x+3.0f,y+.5f,z-1.0f,5.0f,1.5f,5.0f);cloudCube(x-2.0f,y+.3f,z+1.0f,4.0f,1.2f,3.0f);}
+        for(int iz=-2;iz<=2;iz++)for(int ix=-3;ix<=3;ix++){float drift=std::fmod(animationTime*.18f,24.0f);float x=std::floor(px/24.0f)*24.0f+ix*24.0f+((ix+iz)&1?5.0f:0.0f)+drift,z=std::floor(pz/24.0f)*24.0f+iz*24.0f;float y=19.0f+((ix*3+iz*5)&1)*2.0f;cloudCube(x,y,z,7.0f,1.4f,4.0f);cloudCube(x+3.0f,y+.5f,z-1.0f,5.0f,1.5f,5.0f);cloudCube(x-2.0f,y+.3f,z+1.0f,4.0f,1.2f,3.0f);}
         draw(clouds,GL_TRIANGLES,vp,px,feet+1.62f,pz,true,false);
         drawWorldEffects(vp);
         drawKhalil(vp);
