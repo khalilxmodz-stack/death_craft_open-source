@@ -1,3 +1,6 @@
+// Subsystem: Player collision, movement, targeting, block interaction, and combat.
+// Function comments describe each method's responsibility and its place in the game systems.
+
     bool overlaps(float x,float y,float z){
         const float radius=.30f;
         for(int bx=(int)std::floor(x-radius);bx<=(int)std::floor(x+radius);bx++)
