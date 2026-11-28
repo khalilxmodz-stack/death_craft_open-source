@@ -9,7 +9,8 @@ Native Android voxel sandbox built with **C++20**, Android NDK, CMake, and OpenG
 - Health and armor displayed as bars only.
 - Classic pixel-style tree foliage texture at `app/src/main/assets/textures/grass_tree_texture.png`.
 - A complete 20-minute day/night cycle (10 minutes daylight and 10 minutes night), with a fixed-world sun, moon, and yellow stars that disappear in daylight.
-- A small in-game digital clock, black nighttime sky, and slow animated water surface.
+- A small in-game digital clock, black nighttime sky, and slow animated water surface (water vertices only; HUD and text remain stationary).
+- KHALIL, a chasing creeper-like monster that flashes before exploding; loads `khalil_monster.png` from Android assets and uses a solid-white texture if the file is absent.
 - Block-breaking particle bursts, physical dropped block items, and automatic pickup at close range.
 - Player name, FPS counter, hotbar, inventory, and LAN host/join prototype.
 - World fog and view distance tuned for mobile rendering.
@@ -35,7 +36,7 @@ Native Android voxel sandbox built with **C++20**, Android NDK, CMake, and OpenG
 - `systems/player.inc`: movement, collision, targeting, and block editing.
 - `systems/world_update.inc`: simulation, day/night cycle, world-space sky, dropped items, block particles, and frame update.
 - `systems/menu.inc`: main menu layout and name-entry screen.
-- `app/src/main/assets/textures/`: block, foliage, sky, and control textures.
+- `app/src/main/assets/textures/`: block, foliage, sky, and control textures. Optional monster image: `app/src/main/assets/khalil_monster.png` (also accepts `textures/khalil_monster.png`).
 - `stb_image.h`: image decoder.
 
 The `.inc` files are included inside the `Game` class to keep shared state and existing behavior compatible while separating code by responsibility.

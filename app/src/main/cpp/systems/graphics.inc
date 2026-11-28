@@ -2,15 +2,15 @@
     bool setupGL(){
         const char*vs=R"(#version 300 es
         layout(location=0) in vec3 p; layout(location=1) in vec3 c; layout(location=2) in vec2 uvIn;
-        uniform mat4 mvp; uniform vec3 cameraPos; uniform float animTime; out vec3 color; out float fogDistance; out vec2 texCoord;
-        void main(){vec3 pos=p;if(uvIn.x>.80){pos.y+=sin(animTime*1.15+p.x*.72+p.z*.61)*.035;}gl_Position=mvp*vec4(pos,1.0);color=c;texCoord=uvIn;fogDistance=length(pos-cameraPos);})";
+        uniform mat4 mvp; uniform vec3 cameraPos; uniform float animTime; uniform float waterAnimation; out vec3 color; out float fogDistance; out vec2 texCoord;
+        void main(){vec3 pos=p;if(waterAnimation>.5&&uvIn.x>.80){pos.y+=sin(animTime*1.15+p.x*.72+p.z*.61)*.035;}gl_Position=mvp*vec4(pos,1.0);color=c;texCoord=uvIn;fogDistance=length(pos-cameraPos);})";
         const char*fs=R"(#version 300 es
         precision highp float; in vec3 color; in float fogDistance; in vec2 texCoord; uniform float fogEnabled; uniform float textured; uniform sampler2D blockAtlas; uniform vec3 skyColor; out vec4 outColor;
         void main(){vec3 base=color;if(textured>.5)base*=texture(blockAtlas,texCoord).rgb;float fog=fogEnabled*smoothstep(78.0,126.0,fogDistance);outColor=vec4(mix(base,skyColor,fog),1.0);})";
         GLuint a=makeShader(GL_VERTEX_SHADER,vs),b=makeShader(GL_FRAGMENT_SHADER,fs);
         program=glCreateProgram();glAttachShader(program,a);glAttachShader(program,b);glLinkProgram(program);glDeleteShader(a);glDeleteShader(b);
         GLint ok=0;glGetProgramiv(program,GL_LINK_STATUS,&ok);if(!ok)return false;
-        mvpLoc=glGetUniformLocation(program,"mvp");cameraLoc=glGetUniformLocation(program,"cameraPos");fogLoc=glGetUniformLocation(program,"fogEnabled");textureLoc=glGetUniformLocation(program,"textured");atlasLoc=glGetUniformLocation(program,"blockAtlas");skyColorLoc=glGetUniformLocation(program,"skyColor");animTimeLoc=glGetUniformLocation(program,"animTime");
+        mvpLoc=glGetUniformLocation(program,"mvp");cameraLoc=glGetUniformLocation(program,"cameraPos");fogLoc=glGetUniformLocation(program,"fogEnabled");textureLoc=glGetUniformLocation(program,"textured");atlasLoc=glGetUniformLocation(program,"blockAtlas");skyColorLoc=glGetUniformLocation(program,"skyColor");animTimeLoc=glGetUniformLocation(program,"animTime");waterAnimationLoc=glGetUniformLocation(program,"waterAnimation");
         glUseProgram(program);glUniform1i(atlasLoc,0);
         glGenVertexArrays(1,&vao);glGenBuffers(1,&vbo);
         glEnable(GL_DEPTH_TEST);glDisable(GL_CULL_FACE);return true;
@@ -21,6 +21,27 @@
     void addFace(std::vector<float>&v,V3 a,V3 b,V3 c,V3 d,V3 color){
         addTri(v,a,b,c,color,0,0,1,0,1,1);addTri(v,a,c,d,color,0,0,1,1,0,1);
     }
+
+    void loadKhalilTexture(AAssetManager* manager){
+        std::vector<unsigned char> pixels;
+        int w=1,h=1,channels=4;
+        unsigned char white[4]={255,255,255,255};
+        AAsset* asset=manager?AAssetManager_open(manager,"khalil_monster.png",AASSET_MODE_BUFFER):nullptr;
+        if(!asset&&manager)asset=AAssetManager_open(manager,"textures/khalil_monster.png",AASSET_MODE_BUFFER);
+        if(asset){
+            off_t length=AAsset_getLength(asset);std::vector<unsigned char> encoded((size_t)length);
+            int read=(int)AAsset_read(asset,encoded.data(),(size_t)length);AAsset_close(asset);
+            unsigned char* decoded=read>0?stbi_load_from_memory(encoded.data(),read,&w,&h,&channels,4):nullptr;
+            if(decoded){pixels.assign(decoded,decoded+(size_t)w*h*4);stbi_image_free(decoded);LOGE("Loaded khalil_monster.png: %dx%d",w,h);}
+            else LOGE("khalil_monster.png missing or invalid; using solid white monster");
+        }else LOGE("khalil_monster.png missing; using solid white monster");
+        glGenTextures(1,&khalilTexture);glActiveTexture(GL_TEXTURE0);glBindTexture(GL_TEXTURE_2D,khalilTexture);
+        glPixelStorei(GL_UNPACK_ALIGNMENT,1);
+        glTexImage2D(GL_TEXTURE_2D,0,GL_RGBA,w,h,0,GL_RGBA,GL_UNSIGNED_BYTE,pixels.empty()?white:pixels.data());
+        glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_NEAREST);glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_S,GL_CLAMP_TO_EDGE);glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_T,GL_CLAMP_TO_EDGE);
+    }
+
     bool loadTextures(AAssetManager* manager){
         if(!manager)return false;
         constexpr int tile=256, atlasW=tile*5;
@@ -51,5 +72,6 @@
         glPixelStorei(GL_UNPACK_ALIGNMENT,1);glTexImage2D(GL_TEXTURE_2D,0,GL_RGBA,atlasW,tile,0,GL_RGBA,GL_UNSIGNED_BYTE,atlas.data());
         glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_NEAREST_MIPMAP_LINEAR);glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_NEAREST);
         glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_S,GL_CLAMP_TO_EDGE);glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_T,GL_CLAMP_TO_EDGE);glGenerateMipmap(GL_TEXTURE_2D);
+        loadKhalilTexture(manager);
         LOGE("Loaded block textures: %d/5",loaded);return loaded>0;
     }

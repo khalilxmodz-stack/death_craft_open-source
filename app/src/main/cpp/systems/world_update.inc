@@ -117,11 +117,91 @@
         for(const auto&p:blockParticles){float s=.035f*std::clamp(p.life/.5f,.25f,1.0f);cube(p.x,p.y,p.z,s,blockColor(p.id,2));}
         draw(v,GL_TRIANGLES,vp,px,feet+1.62f,pz,true,false);
     }
+
+    void updateKhalil(float dt){
+        if(explosionEffectTimer>0)explosionEffectTimer=std::max(0.0f,explosionEffectTimer-dt);
+        if(!khalilAlive){
+            khalilRespawn+=dt;
+            if(khalilRespawn>24.0f){
+                float angle=(float)(terrainHash((int)px+(int)animationTime,(int)pz)&0xffff)/65535.0f*2.0f*PI;
+                khalilX=px+std::cos(angle)*10.0f;khalilZ=pz+std::sin(angle)*10.0f;
+                khalilFeet=(float)groundHeight((int)std::floor(khalilX),(int)std::floor(khalilZ));
+                khalilAlive=true;khalilPrimed=false;khalilFuse=0;khalilRespawn=0;
+            }
+            return;
+        }
+        if(playerDead)return;
+        float dx=px-khalilX,dz=pz-khalilZ,dist=std::sqrt(dx*dx+dz*dz);
+        if(dist>28.0f){
+            float angle=(float)(terrainHash((int)px+17,(int)pz-29)&0xffff)/65535.0f*2.0f*PI;
+            khalilX=px-std::cos(angle)*10.0f;khalilZ=pz-std::sin(angle)*10.0f;
+            khalilFeet=(float)groundHeight((int)std::floor(khalilX),(int)std::floor(khalilZ));
+            dx=px-khalilX;dz=pz-khalilZ;dist=std::sqrt(dx*dx+dz*dz);
+        }
+        if(dist>2.15f){
+            float step=std::min(2.15f*dt,dist-1.55f);
+            float nx=khalilX+dx/dist*step,nz=khalilZ+dz/dist*step;
+            int gh=groundHeight((int)std::floor(nx),(int)std::floor(nz));
+            if(std::abs((float)gh-khalilFeet)<=1.1f){khalilX=nx;khalilZ=nz;khalilFeet=(float)gh;}
+        }
+        if(dist<2.35f){khalilPrimed=true;khalilFuse+=dt;}
+        if(khalilPrimed&&khalilFuse>=1.35f){
+            explosionX=khalilX;explosionY=khalilFeet+.75f;explosionZ=khalilZ;explosionEffectTimer=.62f;
+            float pdx=px-explosionX,pdy=feet+0.85f-explosionY,pdz=pz-explosionZ;
+            float blastDistance=std::sqrt(pdx*pdx+pdy*pdy+pdz*pdz);
+            if(!creativeMode&&blastDistance<4.5f){
+                int damage=blastDistance<2.0f?8:(blastDistance<3.3f?5:3);
+                int absorbed=std::min(armor,damage);armor-=absorbed;damage-=absorbed;
+                health=std::max(0,health-damage);
+                status="KHALIL EXPLOSION!";statusFrames=120;
+                if(health<=0){playerDead=true;swallowTimer=.001f;deathMessage="KHALIL EXPLODED";}
+            }else{status="KHALIL EXPLODED";statusFrames=100;}
+            khalilAlive=false;khalilRespawn=0;khalilPrimed=false;khalilFuse=0;
+        }
+    }
+    void drawKhalil(const Mat4&vp){
+        if(khalilAlive){
+            std::vector<float> sphere;
+            const int latitudes=12,longitudes=20;
+            auto point=[&](float lat,float lon){return V3{khalilX+.58f*std::cos(lat)*std::sin(lon),khalilFeet+.78f+.72f*std::sin(lat),khalilZ+.58f*std::cos(lat)*std::cos(lon)};};
+            for(int iy=0;iy<latitudes;iy++){
+                float a0=-PI*.5f+PI*iy/latitudes,a1=-PI*.5f+PI*(iy+1)/latitudes;
+                for(int ix=0;ix<longitudes;ix++){
+                    float b0=2*PI*ix/longitudes,b1=2*PI*(ix+1)/longitudes;
+                    V3 p0=point(a0,b0),p1=point(a0,b1),p2=point(a1,b1),p3=point(a1,b0);
+                    float u0=(float)ix/longitudes,u1=(float)(ix+1)/longitudes;
+                    float v0=(float)iy/latitudes,v1=(float)(iy+1)/latitudes;
+                    addTri(sphere,p0,p1,p2,{1,1,1},u0,v0,u1,v0,u1,v1);
+                    addTri(sphere,p0,p2,p3,{1,1,1},u0,v0,u1,v1,u0,v1);
+                }
+            }
+            float pulse=khalilPrimed?.72f+.28f*std::sin(animationTime*18.0f):1.0f;
+            if(khalilPrimed)for(size_t i=0;i<sphere.size();i+=8){sphere[i+3]*=pulse;sphere[i+4]*=pulse;sphere[i+5]*=pulse;}
+            draw(sphere,GL_TRIANGLES,vp,px,feet+1.62f,pz,true,true,khalilTexture);
+            float labelY=khalilFeet+1.72f;
+            float cx=vp.m[0]*khalilX+vp.m[4]*labelY+vp.m[8]*khalilZ+vp.m[12];
+            float cy=vp.m[1]*khalilX+vp.m[5]*labelY+vp.m[9]*khalilZ+vp.m[13];
+            float cw=vp.m[3]*khalilX+vp.m[7]*labelY+vp.m[11]*khalilZ+vp.m[15];
+            if(cw>.05f){float sx=cx/cw,sy=cy/cw;drawText("KHALIL",sx-.05f,sy+.055f,.016f,{1,1,1});}
+        }
+        if(explosionEffectTimer>0){
+            std::vector<float> blast;float radius=4.5f*(1.0f-explosionEffectTimer/.62f);
+            V3 center{explosionX,explosionY,explosionZ};
+            for(int iy=0;iy<10;iy++){float a0=-PI*.5f+PI*iy/10.0f,a1=-PI*.5f+PI*(iy+1)/10.0f;
+                for(int ix=0;ix<16;ix++){float b0=2*PI*ix/16.0f,b1=2*PI*(ix+1)/16.0f;
+                    auto pt=[&](float a,float b){return V3{center.x+radius*std::cos(a)*std::sin(b),center.y+radius*std::sin(a),center.z+radius*std::cos(a)*std::cos(b)};};
+                    V3 p0=pt(a0,b0),p1=pt(a0,b1),p2=pt(a1,b1),p3=pt(a1,b0);
+                    addTri(blast,p0,p1,p2,{1.0f,.32f,.04f});addTri(blast,p0,p2,p3,{1.0f,.32f,.04f});
+                }
+            }
+            draw(blast,GL_TRIANGLES,vp,px,feet+1.62f,pz,true,false);
+        }
+    }
     void frame(float dt){
         fpsAccumulator+=dt;fpsFrames++;if(fpsAccumulator>=0.5f){fpsValue=fpsFrames/fpsAccumulator;fpsFrames=0;fpsAccumulator=0;}
         if(!running||!eglMakeCurrent(display,surface,surface,context))return;dt=std::min(dt,.04f);
         if(!inWorld){glViewport(0,0,width,height);glClearColor(.10f,.18f,.25f,1);glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);drawMenu();eglSwapBuffers(display,surface);return;}
-        if(playerDead){swallowTimer+=dt;if(swallowTimer>2.8f){playerDead=false;swallowTimer=0;health=10;armor=10;px=0;pz=0;feet=(float)groundHeight(0,0);vy=0;grounded=true;grafikX=6;grafikZ=-5;grafikFeet=(float)groundHeight(6,-5);grafikAlive=true;grafikHealth=2;} }
+        if(playerDead){swallowTimer+=dt;if(swallowTimer>2.8f){playerDead=false;swallowTimer=0;health=10;armor=10;px=0;pz=0;feet=(float)groundHeight(0,0);vy=0;grounded=true;grafikX=6;grafikZ=-5;grafikFeet=(float)groundHeight(6,-5);grafikAlive=true;grafikHealth=2;deathMessage="GRAFIK ATE YOU";} }
         dayClock=std::fmod(dayClock+dt,1200.0f);animationTime+=dt;updateSky();
         if(!playerDead){
         float forward=joyY,side=joyX,mag=std::sqrt(forward*forward+side*side);if(mag>1){forward/=mag;side/=mag;}
@@ -153,6 +233,7 @@
         if(breaking){int tx,ty,tz,ax,ay,az;if(raycast(tx,ty,tz,ax,ay,az)){if(tx!=breakX||ty!=breakY||tz!=breakZ){breakX=tx;breakY=ty;breakZ=tz;breakTimer=0;}auto it=chunks.find(chunkKey(floorDiv(tx,CS),floorDiv(tz,CS)));uint8_t q=it==chunks.end()?0:it->second.get(modp(tx,CS),ty,modp(tz,CS));breakTimer+=dt;if(q&&breakTimer>=breakDuration(q)){editBlock(false);breaking=false;breakTimer=0;}}else breakTimer=0;}
         }
         updateGrafik(dt);
+        updateKhalil(dt);
         updateWorldEffects(dt);
         updateLan(dt);
         if(inWorld){saveTimer+=dt;if(saveTimer>=12.0f){saveWorld();saveTimer=0;}}
@@ -165,6 +246,7 @@
         for(int iz=-2;iz<=2;iz++)for(int ix=-2;ix<=2;ix++){float x=std::floor(px/24.0f)*24.0f+ix*24.0f+((ix+iz)&1?5.0f:0.0f),z=std::floor(pz/24.0f)*24.0f+iz*24.0f;float y=19.0f+((ix*3+iz*5)&1)*2.0f;cloudCube(x,y,z,7.0f,1.4f,4.0f);cloudCube(x+3.0f,y+.5f,z-1.0f,5.0f,1.5f,5.0f);cloudCube(x-2.0f,y+.3f,z+1.0f,4.0f,1.2f,3.0f);}
         draw(clouds,GL_TRIANGLES,vp,px,feet+1.62f,pz,true,false);
         drawWorldEffects(vp);
+        drawKhalil(vp);
         if(remoteValid){
             std::vector<float> avatar;
             float rx=remoteX,rz=remoteZ,ry=remoteY;

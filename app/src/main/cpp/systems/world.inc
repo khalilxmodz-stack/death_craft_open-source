@@ -42,7 +42,7 @@
             inventory[6]=creativeMode?Item{7,999999}:Item{7,0};inventory[7]=creativeMode?Item{8,999999}:Item{8,0};
         }
         if(creativeMode)for(auto&i:inventory)if(i.id)i.count=999999;
-        grafikX=6;grafikZ=-5;grafikFeet=(float)groundHeight(6,-5);selected=0;inWorld=true;saveTimer=0;updateWorld();status=loaded?"WORLD LOADED":"WORLD CREATED";statusFrames=120;
+        grafikX=6;grafikZ=-5;grafikFeet=(float)groundHeight(6,-5);khalilX=px+9.0f;khalilZ=pz+4.0f;khalilFeet=(float)groundHeight((int)khalilX,(int)khalilZ);khalilAlive=true;khalilPrimed=false;khalilFuse=0;khalilRespawn=0;explosionEffectTimer=0;deathMessage="GRAFIK ATE YOU";selected=0;inWorld=true;saveTimer=0;updateWorld();status=loaded?"WORLD LOADED":"WORLD CREATED";statusFrames=120;
     }
     uint8_t blockAt(int x,int y,int z)const{
         int cx=floorDiv(x,CS),cz=floorDiv(z,CS);auto it=chunks.find(chunkKey(cx,cz));
