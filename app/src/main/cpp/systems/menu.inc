@@ -2,7 +2,7 @@
     // Function comments describe each method's responsibility and its place in the game systems.
 
     // Renders the settings screen and its graphics controls.
-    void drawSettings() {
+    ) {
         glDisable(GL_DEPTH_TEST);
         std::vector<float> v;
         addFace(v,
@@ -51,7 +51,7 @@
         glEnable(GL_DEPTH_TEST);
     }
     // Renders the main menu and world-creation controls.
-    void drawMenu() {
+    ) {
         glDisable(GL_DEPTH_TEST);
         std::vector<float> v;
         addFace(v,
