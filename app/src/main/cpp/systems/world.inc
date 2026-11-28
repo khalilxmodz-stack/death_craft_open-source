@@ -70,24 +70,53 @@
     void generate(Chunk&c){
         int ox=c.cx*CS,oz=c.cz*CS;
         for(int z=0;z<CS;z++)for(int x=0;x<CS;x++){
-            int h=groundHeight(ox+x,oz+z);
-            for(int y=0;y<h;y++)c.set(x,y,z,y==h-1?1:(y>=h-4?2:3));
+            int wx=ox+x,wz=oz+z,h=groundHeight(wx,wz);
+            for(int y=0;y<h;y++){
+                bool cave=false;
+                if(y>2&&y<h-3){
+                    float tunnel=terrainNoise((wx+y*1.65f)*.067f+31.0f,(wz-y*.92f)*.067f-19.0f);
+                    float chamber=terrainNoise((wx-y*.48f)*.105f-73.0f,(wz+y*.62f)*.105f+47.0f);
+                    cave=tunnel>.69f&&chamber>.48f;
+                }
+                if(!cave)c.set(x,y,z,y==h-1?1:(y>=h-4?2:3));
+            }
             if(h<SEA_LEVEL)for(int y=h;y<SEA_LEVEL;y++)c.set(x,y,z,9);
         }
         auto put=[&](int x,int y,int z,uint8_t id){if(floorDiv(x,CS)==c.cx&&floorDiv(z,CS)==c.cz)c.set(modp(x,CS),y,modp(z,CS),id);};
-        for(int z=oz-2;z<oz+CS+2;z++)for(int x=ox-2;x<ox+CS+2;x++){
+        // Four deterministic silhouettes: oak, pine, broad crown and slim birch-like tree.
+        for(int z=oz-5;z<oz+CS+5;z++)for(int x=ox-5;x<ox+CS+5;x++){
             if(modp(x+3,8)||modp(z+5,8))continue;
-            uint32_t h=terrainHash(x,z);if(h%3==0)continue;
-            int ground=groundHeight(x,z);if(ground>7||ground<SEA_LEVEL)continue;
-            int trunk=3+(int)(h%2);
+            uint32_t h=terrainHash(x,z);if(h%4==0)continue;
+            int ground=groundHeight(x,z);if(ground<SEA_LEVEL||ground>12)continue;
+            int type=(h>>5)%4;
+            int trunk=type==1?5+(int)((h>>9)%2):(type==3?4:3+(int)((h>>9)%2));
             for(int y=0;y<trunk;y++)put(x,ground+y,z,4);
             int top=ground+trunk;
-            for(int dy=-1;dy<=1;dy++)for(int dz=-1;dz<=1;dz++)for(int dx=-1;dx<=1;dx++){
-                if(std::abs(dx)==1&&std::abs(dz)==1&&dy!=1)continue;
-                if(dx==0&&dz==0&&dy<=0)continue;
-                put(x+dx,top+dy,z+dz,5);
+            if(type==1){
+                for(int layer=0;layer<4;layer++){
+                    int radius=3-layer,yy=top-2+layer;
+                    for(int dz=-radius;dz<=radius;dz++)for(int dx=-radius;dx<=radius;dx++)
+                        if(std::abs(dx)+std::abs(dz)<=radius+1)put(x+dx,yy,z+dz,5);
+                }
+                put(x,top+2,z,5);
+            }else if(type==2){
+                for(int dy=-1;dy<=2;dy++){
+                    int radius=(dy==2?1:(dy==-1?2:3));
+                    for(int dz=-radius;dz<=radius;dz++)for(int dx=-radius;dx<=radius;dx++)
+                        if(dx*dx+dz*dz<=radius*radius+1)put(x+dx,top+dy,z+dz,5);
+                }
+            }else if(type==3){
+                for(int dy=-1;dy<=1;dy++)for(int dx=-1;dx<=1;dx++)for(int dz=-1;dz<=1;dz++)
+                    if(std::abs(dx)+std::abs(dz)<=1)put(x+dx,top+dy,z+dz,5);
+                put(x,top+1,z,5);
+            }else{
+                for(int dy=-1;dy<=1;dy++)for(int dz=-1;dz<=1;dz++)for(int dx=-1;dx<=1;dx++){
+                    if(std::abs(dx)==1&&std::abs(dz)==1&&dy!=1)continue;
+                    if(dx==0&&dz==0&&dy<=0)continue;
+                    put(x+dx,top+dy,z+dz,5);
+                }
+                put(x,top+1,z,5);
             }
-            put(x,top+1,z,5);
         }
         for(const auto& e:edits){
             int x=std::get<0>(e.first), y=std::get<1>(e.first), z=std::get<2>(e.first);
@@ -106,4 +135,4 @@
         if(b==2)return{.48f,.31f,.17f};if(b==3)return{.43f,.45f,.48f};
         if(b==4)return{.43f,.27f,.12f};if(b==5)return{.12f,.48f,.13f};if(b==6)return{.67f,.46f,.24f};if(b==10||b==11)return{1,1,1};return{.72f,.62f,.35f};
     }
-    float breakDuration(uint8_t b)const{switch(b){case 1:return .65f;case 2:return .90f;case 3:return 2.10f;case 4:return 1.25f;case 5:return .30f;case 6:return 1.10f;case 10:return .25f;case 11:return .25f;default:return .85f;}}
+    float breakDuration(uint8_t b)const{bool pickaxe=selected>=0&&selected<(int)inventory.size()&&inventory[selected].count>0&&inventory[selected].id==12;if(pickaxe&&b==3)return .24f;if(pickaxe&&b==2)return .42f;switch(b){case 1:return .65f;case 2:return .90f;case 3:return 2.10f;case 4:return 1.25f;case 5:return .30f;case 6:return 1.10f;case 10:return .25f;case 11:return .25f;default:return .85f;}}
