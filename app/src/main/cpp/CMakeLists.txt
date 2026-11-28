@@ -22,4 +22,5 @@ target_link_libraries(deathcraft
     log
     EGL
     GLESv3
+    OpenSLES
 )
