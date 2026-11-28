@@ -1,6 +1,7 @@
 // Subsystem: Chunk mesh generation, OpenGL submission, HUD, inventory, and text rendering.
 // Function comments describe each method's responsibility and its place in the game systems.
 
+    // Builds the visible mesh and shadow mesh for a chunk.
     void rebuild(Chunk&c){
         c.mesh.clear();c.shadowMesh.clear();int ox=c.cx*CS,oz=c.cz*CS;
         auto localSolid=[&](int x,int y,int z){
@@ -88,6 +89,7 @@
         c.mesh.clear();c.mesh.shrink_to_fit();
         c.dirty=false;
     }
+    // Submits a chunk's cached mesh to the graphics pipeline.
     void drawChunk(const Chunk&c,const Mat4&m,float cx,float cy,float cz){
         if(!c.meshVbo||c.meshVertexCount<=0)return;
         glUseProgram(program);
@@ -103,6 +105,7 @@
         glEnableVertexAttribArray(2);glVertexAttribPointer(2,2,GL_FLOAT,GL_FALSE,8*sizeof(float),(void*)(6*sizeof(float)));
         glDrawArrays(GL_TRIANGLES,0,c.meshVertexCount);
     }
+    // Uploads and draws a vertex buffer with the requested render state.
     void draw(const std::vector<float>&v,GLenum mode,const Mat4&m,float cx=0,float cy=0,float cz=0,bool fog=true,bool textured=false,GLuint textureOverride=0,bool animateWater=true){
         if(v.empty())return;glUseProgram(program);glUniformMatrix4fv(mvpLoc,1,GL_FALSE,m.m);glUniform3f(cameraLoc,cx,cy,cz);glUniform1f(fogLoc,fog?1.0f:0.0f);glUniform1f(textureLoc,textured&&(textureOverride||atlasTexture)?1.0f:0.0f);glUniform3f(skyColorLoc,skyTint.x,skyTint.y,skyTint.z);glUniform1f(animTimeLoc,animationTime);glUniform1f(waterAnimationLoc,textured&&!textureOverride&&animateWater?1.0f:0.0f);glUniform1f(fogStartLoc,(float)drawDistance*CS*1.05f);glUniform1f(fogEndLoc,(float)drawDistance*CS*1.65f);glUniform1f(worldLightLoc,worldBrightness);
         glActiveTexture(GL_TEXTURE0);glBindTexture(GL_TEXTURE_2D,textureOverride?textureOverride:atlasTexture);
@@ -112,6 +115,7 @@
         glEnableVertexAttribArray(2);glVertexAttribPointer(2,2,GL_FLOAT,GL_FALSE,8*sizeof(float),(void*)(6*sizeof(float)));
         glDrawArrays(mode,0,(GLsizei)(v.size()/8));
     }
+    // Renders a textured inventory icon for a block or item ID.
     void drawBlockIcon(uint8_t id,float x,float y,float w,float h){
         std::vector<float> icon;V3 white{1,1,1};
         if(id==15||id==16){float cx=x+w*.5f;addTri(icon,{cx-w*.06f,y+h*.05f,0},{cx+w*.06f,y+h*.05f,0},{cx+w*.045f,y+h*.67f,0},{.48f,.28f,.12f});addTri(icon,{cx-w*.06f,y+h*.05f,0},{cx+w*.045f,y+h*.67f,0},{cx-w*.045f,y+h*.67f,0},{.60f,.36f,.16f});if(id==15){addTri(icon,{cx-w*.02f,y+h*.68f,0},{x+w*.14f,y+h*.96f,0},{x+w*.48f,y+h*.78f,0},{.57f,.34f,.14f});addTri(icon,{cx-w*.02f,y+h*.68f,0},{x+w*.48f,y+h*.78f,0},{x+w*.84f,y+h*.96f,0},{.57f,.34f,.14f});}else{addTri(icon,{x+w*.12f,y+h*.68f,0},{x+w*.88f,y+h*.68f,0},{x+w*.78f,y+h*.84f,0},{.62f,.39f,.17f});addTri(icon,{x+w*.12f,y+h*.68f,0},{x+w*.78f,y+h*.84f,0},{x+w*.22f,y+h*.84f,0},{.72f,.48f,.22f});}draw(icon,GL_TRIANGLES,identity(),0,0,0,false,false,0,false);return;}
@@ -142,6 +146,7 @@
         addTri(icon,{x,y,0},{x+w,y+h,0},{x,y+h,0},white,u0,v0,u1,v1,u0,v1);
         draw(icon,GL_TRIANGLES,identity(),0,0,0,false,true,0,false);
     }
+    // Renders the in-game heads-up display and touch controls.
     void drawHud(){
         glDisable(GL_DEPTH_TEST);Mat4 m=identity();std::vector<float>v;
         auto t=[&](float x,float y,float X,float Y,float Z,float W,V3 c){addTri(v,{x,y,0},{X,Y,0},{Z,W,0},c);};
@@ -150,6 +155,7 @@
         auto line=[&](float x,float y,float X,float Y,float q,V3 c){float dx=X-x,dy=Y-y,l=sqrtf(dx*dx+dy*dy);if(l<.001f)return;float ox=-dy/l*q,oy=dx/l*q;t(x+ox,y+oy,X+ox,Y+oy,X-ox,Y-oy,c);t(x+ox,y+oy,X-ox,Y-oy,x-ox,y-oy,c);};
         rect(-.94f,-.985f,.20f,.075f,lanMode==2?V3{.12f,.58f,.22f}:V3{.05f,.28f,.11f});
         rect(-.70f,-.985f,.20f,.075f,lanMode==1?V3{.12f,.40f,.78f}:V3{.06f,.20f,.42f});
+    // Renders a string using the game's bitmap font.
         drawText("JOIN",-.91f,-.925f,.012f,{1,1,1});drawText("HOST",-.67f,-.925f,.012f,{1,1,1});
         drawText("FPS:"+std::to_string((int)fpsValue),.63f,.68f,.018f,{1,1,1});
         rect(.84f,.57f,.13f,.10f,{.04f,.05f,.07f});drawText("SET",.875f,.60f,.012f,{1,1,1});rect(.82f,.30f,.16f,.12f,{.10f,.16f,.22f});drawText(spectatorMode?"SPEC":(creativeMode?"CREA":"SURV"),.835f,.335f,.011f,{1,1,1});
@@ -190,6 +196,7 @@
         if(playerDead){float k=std::clamp(swallowTimer/2.8f,0.0f,1.0f);std::vector<float> overlay;addFace(overlay,{-1,-1,0},{1,-1,0},{1,1,0},{-1,1,0},{.015f+.035f*k,.005f,.018f+.025f*k});draw(overlay,GL_TRIANGLES,identity(),0,0,0,false);std::vector<float>mouth;for(int i=0;i<48;i++){float a=i*2*PI/48,b=(i+1)*2*PI/48;addTri(mouth,{0,0,0},{std::cos(a)*(.10f+.70f*k),std::sin(a)*(.10f+.70f*k),0},{std::cos(b)*(.10f+.70f*k),std::sin(b)*(.10f+.70f*k),0},{.005f,.002f,.008f});}draw(mouth,GL_TRIANGLES,identity(),0,0,0,false);drawText(deathMessage.empty()?std::string("YOU DIED"):deathMessage,-.52f,-.72f,.035f,{1,.25f,.30f});}
         glEnable(GL_DEPTH_TEST);
     }
+    // Renders inventory slots, item icons, and crafting controls.
     void drawInventory(){
         glDisable(GL_DEPTH_TEST);std::vector<float>v;auto r=[&](float x,float y,float w,float h,V3 c){addFace(v,{x,y,0},{x+w,y,0},{x+w,y+h,0},{x,y+h,0},c);};
         r(-.78f,-.73f,1.56f,1.43f,{.03f,.03f,.04f});r(-.75f,-.70f,1.50f,1.37f,{.13f,.14f,.16f});
@@ -197,6 +204,7 @@
         r(.60f,.27f,.15f,.15f,{.02f,.02f,.025f});r(.60f,-.02f,.15f,.15f,{.02f,.02f,.025f});r(.60f,-.31f,.15f,.15f,{.02f,.02f,.025f});r(.60f,-.60f,.15f,.12f,{.02f,.02f,.025f});draw(v,GL_TRIANGLES,identity(),0,0,0,false);for(int i=0;i<20;i++)if(inventory[i].count&&i!=dragIndex){int row=i/5,col=i%5;float x=-.58f+col*.235f,y=.30f-row*.245f;drawBlockIcon(inventory[i].id,x+.055f,y-.135f,.075f,.09f);}if(dragIndex>=0&&inventory[dragIndex].count)drawBlockIcon(inventory[dragIndex].id,dragX-.035f,dragY-.035f,.075f,.09f);
         drawText(craftingTableOpen?"CRAFTING TABLE":"INVENTORY",-.25f,.62f,.025f,{1,.85f,.35f});drawText("INVENTORY",-.22f,.47f,.012f,{.8f,.85f,.9f});drawText("RECIPES",.62f,.38f,.011f,{.8f,.85f,.9f});drawText("DRAG TO MOVE - OUTSIDE TO DROP",-.52f,-.66f,.012f,{1,1,1});drawText(craftingTableOpen?"WOOD AXE":"PLANKS",.57f,.48f,.015f,{1,1,1});drawText(craftingTableOpen?"WOOD PICK":"STICKS",.58f,.19f,.015f,{1,1,1});drawText(craftingTableOpen?"IRON BLOCK":"TABLE",.59f,-.10f,.015f,{1,1,1});drawText("BED",.63f,-.55f,.015f,{1,1,1});drawText("X",.66f,.62f,.025f,{1,1,1});glEnable(GL_DEPTH_TEST);
     }
+    // Maps a supported character to its bitmap-font glyph data.
     std::array<uint8_t,7> glyph(char c){
         switch(c){
         case 'A':return {14,17,17,31,17,17,17};case 'B':return {30,17,17,30,17,17,30};
