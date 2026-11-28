@@ -5,12 +5,12 @@
         uniform mat4 mvp; uniform vec3 cameraPos; uniform float animTime; uniform float waterAnimation; out vec3 color; out float fogDistance; out vec2 texCoord;
         void main(){vec3 pos=p;if(waterAnimation>.5&&uvIn.x>.80){pos.y+=sin(animTime*1.15+p.x*.72+p.z*.61)*.035;}gl_Position=mvp*vec4(pos,1.0);color=c;texCoord=uvIn;fogDistance=length(pos-cameraPos);})";
         const char*fs=R"(#version 300 es
-        precision highp float; in vec3 color; in float fogDistance; in vec2 texCoord; uniform float fogEnabled; uniform float textured; uniform sampler2D blockAtlas; uniform vec3 skyColor; out vec4 outColor;
-        void main(){vec3 base=color;if(textured>.5)base*=texture(blockAtlas,texCoord).rgb;base=pow(max(base,vec3(0.0)),vec3(0.92));base=clamp((base-vec3(0.5))*1.10+vec3(0.5),0.0,1.0);float fog=fogEnabled*smoothstep(150.0,240.0,fogDistance);outColor=vec4(mix(base,skyColor,fog),1.0);})";
+        precision highp float; in vec3 color; in float fogDistance; in vec2 texCoord; uniform float fogEnabled; uniform float textured; uniform sampler2D blockAtlas; uniform vec3 skyColor; uniform float fogStart; uniform float fogEnd; out vec4 outColor;
+        void main(){vec3 base=color;if(textured>.5)base*=texture(blockAtlas,texCoord).rgb;base=pow(max(base,vec3(0.0)),vec3(0.92));base=clamp((base-vec3(0.5))*1.10+vec3(0.5),0.0,1.0);float fog=fogEnabled*smoothstep(fogStart,fogEnd,fogDistance);outColor=vec4(mix(base,skyColor,fog),1.0);})";
         GLuint a=makeShader(GL_VERTEX_SHADER,vs),b=makeShader(GL_FRAGMENT_SHADER,fs);
         program=glCreateProgram();glAttachShader(program,a);glAttachShader(program,b);glLinkProgram(program);glDeleteShader(a);glDeleteShader(b);
         GLint ok=0;glGetProgramiv(program,GL_LINK_STATUS,&ok);if(!ok)return false;
-        mvpLoc=glGetUniformLocation(program,"mvp");cameraLoc=glGetUniformLocation(program,"cameraPos");fogLoc=glGetUniformLocation(program,"fogEnabled");textureLoc=glGetUniformLocation(program,"textured");atlasLoc=glGetUniformLocation(program,"blockAtlas");skyColorLoc=glGetUniformLocation(program,"skyColor");animTimeLoc=glGetUniformLocation(program,"animTime");waterAnimationLoc=glGetUniformLocation(program,"waterAnimation");
+        mvpLoc=glGetUniformLocation(program,"mvp");cameraLoc=glGetUniformLocation(program,"cameraPos");fogLoc=glGetUniformLocation(program,"fogEnabled");textureLoc=glGetUniformLocation(program,"textured");atlasLoc=glGetUniformLocation(program,"blockAtlas");skyColorLoc=glGetUniformLocation(program,"skyColor");animTimeLoc=glGetUniformLocation(program,"animTime");waterAnimationLoc=glGetUniformLocation(program,"waterAnimation");fogStartLoc=glGetUniformLocation(program,"fogStart");fogEndLoc=glGetUniformLocation(program,"fogEnd");
         glUseProgram(program);glUniform1i(atlasLoc,0);
         glGenVertexArrays(1,&vao);glGenBuffers(1,&vbo);
         glEnable(GL_DEPTH_TEST);glDisable(GL_CULL_FACE);return true;
@@ -22,6 +22,11 @@
         addTri(v,a,b,c,color,0,0,1,0,1,1);addTri(v,a,c,d,color,0,0,1,1,0,1);
     }
 
+    void applyGraphicsFiltering(){
+        GLenum filter=smoothGraphics?GL_LINEAR:GL_NEAREST;
+        if(atlasTexture){glBindTexture(GL_TEXTURE_2D,atlasTexture);glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,filter);glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,smoothGraphics?GL_LINEAR_MIPMAP_LINEAR:GL_NEAREST);}
+        if(khalilTexture){glBindTexture(GL_TEXTURE_2D,khalilTexture);glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,filter);glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,filter);}
+    }
     void loadKhalilTexture(AAssetManager* manager){
         std::vector<unsigned char> pixels;
         int w=1,h=1,channels=4;
@@ -44,16 +49,16 @@
 
     bool loadTextures(AAssetManager* manager){
         if(!manager)return false;
-        constexpr int tile=256, atlasW=tile*6;
+        constexpr int tile=256, atlasW=tile*7;
         std::vector<unsigned char> atlas((size_t)atlasW*tile*4,255);
-        const char* names[]={"textures/grass_texture.png","textures/dirt_texture.png","textures/stone_texture.png","textures/grass_tree_texture.png","textures/water_texture.png","textures/tnt.png"};
-        const unsigned char fallback[6][4]={{78,156,55,255},{126,79,43,255},{116,122,130,255},{49,126,48,255},{28,112,190,210},{255,255,255,255}};
-        for(int layer=0;layer<6;layer++)for(int y=0;y<tile;y++)for(int x=0;x<tile;x++){
+        const char* names[]={"textures/grass_texture.png","textures/dirt_texture.png","textures/stone_texture.png","textures/grass_tree_texture.png","textures/water_texture.png","textures/tnt.png","textures/sword.png"};
+        const unsigned char fallback[7][4]={{78,156,55,255},{126,79,43,255},{116,122,130,255},{49,126,48,255},{28,112,190,210},{255,255,255,255},{255,255,255,255}};
+        for(int layer=0;layer<7;layer++)for(int y=0;y<tile;y++)for(int x=0;x<tile;x++){
             size_t dst=((size_t)y*atlasW+(size_t)layer*tile+x)*4;
             std::copy(fallback[layer],fallback[layer]+4,atlas.begin()+dst);
         }
         int loaded=0;stbi_set_flip_vertically_on_load(1);
-        for(int layer=0;layer<6;layer++){
+        for(int layer=0;layer<7;layer++){
             AAsset* asset=AAssetManager_open(manager,names[layer],AASSET_MODE_BUFFER);
             if(!asset){LOGE("Texture asset missing: %s",names[layer]);continue;}
             off_t length=AAsset_getLength(asset);std::vector<unsigned char> encoded((size_t)length);
@@ -72,6 +77,6 @@
         glPixelStorei(GL_UNPACK_ALIGNMENT,1);glTexImage2D(GL_TEXTURE_2D,0,GL_RGBA,atlasW,tile,0,GL_RGBA,GL_UNSIGNED_BYTE,atlas.data());
         glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_NEAREST);glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_NEAREST);
         glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_S,GL_CLAMP_TO_EDGE);glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_T,GL_CLAMP_TO_EDGE);glGenerateMipmap(GL_TEXTURE_2D);
-        loadKhalilTexture(manager);
-        LOGE("Loaded block textures: %d/6",loaded);return loaded>0;
+        loadKhalilTexture(manager);applyGraphicsFiltering();
+        LOGE("Loaded block and sword textures: %d/7",loaded);return loaded>0;
     }
