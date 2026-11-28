@@ -79,7 +79,7 @@
         attackGrafik();
     }
     void attackMonster(){
-        if(playerDead)return;
+        if(playerDead||swordCooldown>0)return;
         float fx=std::sin(yaw),fz=-std::cos(yaw);
         float gdX=grafikX-px,gdZ=grafikZ-pz,gDist=std::sqrt(gdX*gdX+gdZ*gdZ);
         float kdX=khalilX-px,kdZ=khalilZ-pz,kDist=std::sqrt(kdX*kdX+kdZ*kdZ);
@@ -88,12 +88,14 @@
         float dx=hitGrafik?gdX:kdX,dz=hitGrafik?gdZ:kdZ,dist=hitGrafik?gDist:kDist;
         float facing=dist>.001f?(dx*fx+dz*fz)/dist:1.0f;
         if((!hitGrafik&&!hitKhalil)||facing<.30f){status="MONSTER OUT OF REACH";statusFrames=70;return;}
+        swordCooldown=.34f;
         if(lanMode==2){
             LanPacket hit{};hit.type=6;hit.player=networkId;hit.x=px;hit.y=feet;hit.z=pz;hit.yaw=yaw;hit.flags=hitGrafik?1:0;hit.block=3;sendLan(hit);
             status="SWORD SWING";statusFrames=35;return;
         }
         if(hitGrafik){
             grafikHealth=std::max(0,grafikHealth-3);grafikHitTimer=.28f;
+            if(lanMode==1){LanPacket state{};state.type=7;state.player=networkId;state.flags=1;state.block=(uint8_t)grafikHealth;sendLan(state);}
             status=grafikHealth<=0?"GRAFIK DEFEATED":"GRAFIK HIT";statusFrames=90;
             if(grafikHealth<=0){grafikAlive=false;grafikRespawn=0;}
         }else{
