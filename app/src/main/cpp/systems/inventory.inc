@@ -1,3 +1,6 @@
+// Subsystem: Inventory stacking, item consumption, crafting, and slot selection.
+// Function comments describe each method's responsibility and its place in the game systems.
+
     bool addItem(uint8_t id,int n){
         if(!id||n<=0)return true;
         for(auto &i:inventory)if(i.id==id&&i.count>0&&i.count<64&&n>0){int add=std::min(64-i.count,n);i.count+=add;n-=add;}
