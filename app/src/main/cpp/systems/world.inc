@@ -343,36 +343,36 @@
         return true;
     }
     // Attempts to move a mob up a small ledge without collision.
-    
+
         float x, float z, float oldFeet, float radius, float bodyHeight, float& newFeet) {
-        float surface = mobSurfaceHeight(x, z, oldFeet);
-        if (surface < 0.0f || std::abs(surface - oldFeet) > 1.05f)
-            return false;
-        if (!mobCanStandAt(x, surface, z, radius, bodyHeight))
-            return false;
-        newFeet = surface;
-        return true;
-    }
-    // Moves a mob while following terrain and avoiding solid blocks.
-    
+            float surface = mobSurfaceHeight(x, z, oldFeet);
+            if (surface < 0.0f || std::abs(surface - oldFeet) > 1.05f)
+                return false;
+            if (!mobCanStandAt(x, surface, z, radius, bodyHeight))
+                return false;
+            newFeet = surface;
+            return true;
+        }
+        // Moves a mob while following terrain and avoiding solid blocks.
+
         float& x, float& z, float& feetY, float nx, float nz, float radius, float bodyHeight) {
-        float nextFeet = feetY;
-        if (mobTryStep(nx, nz, feetY, radius, bodyHeight, nextFeet)) {
-            x = nx;
-            z = nz;
-            feetY = nextFeet;
-            return;
+            float nextFeet = feetY;
+            if (mobTryStep(nx, nz, feetY, radius, bodyHeight, nextFeet)) {
+                x = nx;
+                z = nz;
+                feetY = nextFeet;
+                return;
+            }
+            if (mobTryStep(nx, z, feetY, radius, bodyHeight, nextFeet)) {
+                x = nx;
+                feetY = nextFeet;
+            }
+            if (mobTryStep(x, nz, feetY, radius, bodyHeight, nextFeet)) {
+                z = nz;
+                feetY = nextFeet;
+            }
         }
-        if (mobTryStep(nx, z, feetY, radius, bodyHeight, nextFeet)) {
-            x = nx;
-            feetY = nextFeet;
-        }
-        if (mobTryStep(x, nz, feetY, radius, bodyHeight, nextFeet)) {
-            z = nz;
-            feetY = nextFeet;
-        }
-    }
-    // Queues a chunk for mesh rebuilding after its contents change.
+        // Queues a chunk for mesh rebuilding after its contents change.
     int cx, int cz) {
         auto it = chunks.find(chunkKey(cx, cz));
         if (it == chunks.end())
