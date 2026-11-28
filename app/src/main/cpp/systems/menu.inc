@@ -1,6 +1,7 @@
 // Subsystem: Main-menu and settings-screen rendering.
 // Function comments describe each method's responsibility and its place in the game systems.
 
+    // Renders the settings screen and its graphics controls.
     void drawSettings(){
         glDisable(GL_DEPTH_TEST);std::vector<float>v;
         addFace(v,{-.78f,-.72f,0},{.78f,-.72f,0},{.78f,.72f,0},{-.78f,.72f,0},{.025f,.035f,.05f});
@@ -16,6 +17,7 @@
         drawText("SMOOTHER TEXTURES  |  3-10 CHUNKS",-.43f,-.52f,.012f,{.8f,.85f,.9f});drawText("X",.665f,.60f,.025f,{1,.5f,.5f});
         glEnable(GL_DEPTH_TEST);
     }
+    // Renders the main menu and world-creation controls.
     void drawMenu(){
         glDisable(GL_DEPTH_TEST);
         std::vector<float>v;
