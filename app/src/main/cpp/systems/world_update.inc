@@ -311,7 +311,7 @@
             for(int bx=(int)std::floor(it->x)-radius;bx<=(int)std::floor(it->x)+radius;bx++){
                 float dx=bx+.5f-it->x,dy=by+.5f-it->y,dz=bz+.5f-it->z;
                 if(dx*dx+dy*dy+dz*dz>12.25f)continue;
-                uint8_t block=blockAt(bx,by,bz);if(!block)continue;
+                uint8_t block=blockAt(bx,by,bz);if(!block||block==19)continue;
                 Chunk&chunk=ensureChunk(floorDiv(bx,CS),floorDiv(bz,CS));
                 chunk.set(modp(bx,CS),by,modp(bz,CS),0);edits[{bx,by,bz}]=0;markBlockDirty(bx,by,bz);
                 if(lanMode==1){LanPacket packet{};packet.type=3;packet.player=networkId;packet.bx=bx;packet.by=by;packet.bz=bz;packet.block=0;sendLan(packet);}

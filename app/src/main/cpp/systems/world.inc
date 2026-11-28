@@ -26,7 +26,7 @@
         for(auto&i:inventory){int32_t n=0;in.read((char*)&i.id,1);in.read((char*)&n,4);i.count=std::clamp(n,0,999999);}
         in.read((char*)&count,4);if(!in||count>2000000)return false;
         edits.clear();for(uint32_t i=0;i<count;i++){int32_t x,y,z;uint8_t b;in.read((char*)&x,4);in.read((char*)&y,4);in.read((char*)&z,4);in.read((char*)&b,1);if(!in)return false;edits[{x,y,z}]=b;}
-        if(version==1)feet=(float)groundHeight((int)std::floor(px),(int)std::floor(pz));creativeMode=mode!=0;spectatorMode=false;flatWorld=flat!=0;health=std::clamp(hp,0,10);armor=std::clamp(ap,0,10);selected=std::clamp(sel,0,4);return true;
+        creativeMode=mode!=0;spectatorMode=false;flatWorld=flat!=0;if(version==1)feet=(float)groundHeight((int)std::floor(px),(int)std::floor(pz));health=std::clamp(hp,0,10);armor=std::clamp(ap,0,10);selected=std::clamp(sel,0,4);return true;
     }
     void cycleGameMode(){if(!creativeMode&&!spectatorMode){creativeMode=true;spectatorMode=false;status="CREATIVE MODE";}else if(creativeMode){creativeMode=false;spectatorMode=true;status="SPECTATOR MODE";}else{creativeMode=false;spectatorMode=false;status="SURVIVAL MODE";}if(creativeMode)for(auto&i:inventory)if(i.id)i.count=999999;statusFrames=90;}
     void startWorld(){
