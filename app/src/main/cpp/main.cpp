@@ -65,9 +65,11 @@ static int terrainHeight(int x,int z){
     float detail=terrainNoise(x*.16f+71,z*.16f-59);
     float mountain=terrainNoise(x*.012f+107,z*.012f-83);
     float peaks=terrainNoise(x*.038f-37,z*.038f+91);
-    float small=(broad-.5f)*3.4f+(hills-.5f)*3.8f+(detail-.5f)*1.2f;
-    float high=std::pow(std::max(0.0f,(mountain-.60f)/.40f),1.45f)*15.0f+
-               std::pow(std::max(0.0f,(peaks-.70f)/.30f),2.0f)*5.0f;
+    float ridgeNoise=terrainNoise(x*.052f+129,z*.052f-147);
+    float small=(broad-.5f)*4.0f+(hills-.5f)*4.6f+(detail-.5f)*1.8f;
+    float high=std::pow(std::max(0.0f,(mountain-.56f)/.44f),1.25f)*19.0f+
+                 std::pow(std::max(0.0f,(peaks-.65f)/.35f),1.7f)*7.0f+
+                 std::pow(std::max(0.0f,(ridgeNoise-.82f)/.18f),2.0f)*2.8f;
     return std::clamp((int)std::lround(3.0f+small+high),1,HEIGHT-7);
 }
 static uint64_t chunkKey(int x,int z){return (uint64_t)(uint32_t)x<<32|(uint32_t)z;}
