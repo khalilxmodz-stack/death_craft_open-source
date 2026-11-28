@@ -3,7 +3,7 @@
         const char*vs=R"(#version 300 es
         layout(location=0) in vec3 p; layout(location=1) in vec3 c; layout(location=2) in vec2 uvIn;
         uniform mat4 mvp; uniform vec3 cameraPos; uniform float animTime; uniform float waterAnimation; out vec3 color; out float fogDistance; out vec2 texCoord;
-        void main(){vec3 pos=p;if(waterAnimation>.5&&uvIn.x>.80){pos.y+=sin(animTime*1.15+p.x*.72+p.z*.61)*.035;}gl_Position=mvp*vec4(pos,1.0);color=c;texCoord=uvIn;fogDistance=length(pos-cameraPos);})";
+        void main(){vec3 pos=p;if(waterAnimation>.5&&uvIn.x>=(4.0/12.0)&&uvIn.x<(5.0/12.0)){pos.y+=sin(animTime*1.15+p.x*.72+p.z*.61)*.035;}gl_Position=mvp*vec4(pos,1.0);color=c;texCoord=uvIn;fogDistance=length(pos-cameraPos);})";
         const char*fs=R"(#version 300 es
         precision highp float; in vec3 color; in float fogDistance; in vec2 texCoord; uniform float fogEnabled; uniform float textured; uniform sampler2D blockAtlas; uniform vec3 skyColor; uniform float fogStart; uniform float fogEnd; uniform float worldLight; out vec4 outColor;
         void main(){vec4 texel=vec4(1.0);if(textured>.5)texel=texture(blockAtlas,texCoord);vec3 base=color*texel.rgb;base*=worldLight;base=pow(max(base,vec3(0.0)),vec3(0.96));base=clamp((base-vec3(0.5))*1.06+vec3(0.5),0.0,1.0);float fog=fogEnabled*smoothstep(fogStart,fogEnd,fogDistance);outColor=vec4(mix(base,skyColor,fog),textured>.5?texel.a:1.0);})";
