@@ -2,7 +2,7 @@
     // Function comments describe each method's responsibility and its place in the game systems.
 
     // Starts or configures the host or client LAN session.
-    void setLanMode(int mode) {
+    int mode) {
         if (lanSocket < 0) {
             lanSocket = socket(AF_INET, SOCK_DGRAM, 0);
             if (lanSocket < 0) {
@@ -44,12 +44,12 @@
         statusFrames = 180;
     }
     // Broadcasts one game-state packet to LAN peers.
-    void sendLan(const LanPacket& p) {
+    const LanPacket& p) {
         if (lanSocket >= 0)
             sendto(lanSocket, &p, sizeof(p), 0, (sockaddr*)&lanBroadcast, sizeof(lanBroadcast));
     }
     // Receives LAN packets and synchronizes players and world entities.
-    void updateLan(float dt) {
+    float dt) {
         if (lanSocket < 0 || lanMode == 0)
             return;
         LanPacket p{};
