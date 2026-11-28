@@ -26,6 +26,15 @@
     }
     void drawBlockIcon(uint8_t id,float x,float y,float w,float h){
         std::vector<float> icon;V3 white{1,1,1};
+        if(id==12){
+            float cx=x+w*.5f,hy=y+h*.63f;
+            addTri(icon,{cx-w*.055f,y+h*.04f,0},{cx+w*.055f,y+h*.04f,0},{cx+w*.04f,hy,0},{.42f,.23f,.09f});
+            addTri(icon,{cx-w*.055f,y+h*.04f,0},{cx+w*.04f,hy,0},{cx-w*.04f,hy,0},{.54f,.32f,.13f});
+            addTri(icon,{x+w*.13f,hy,0},{x+w*.87f,hy,0},{x+w*.77f,y+h*.80f,0},{.72f,.77f,.84f});
+            addTri(icon,{x+w*.13f,hy,0},{x+w*.77f,y+h*.80f,0},{x+w*.23f,y+h*.80f,0},{.88f,.91f,.96f});
+            addTri(icon,{x+w*.23f,y+h*.80f,0},{x+w*.77f,y+h*.80f,0},{cx,y+h*.98f,0},{.58f,.64f,.73f});
+            draw(icon,GL_TRIANGLES,identity(),0,0,0,false,false,0,false);return;
+        }
         if(id==11){
             float cx=x+w*.5f;
             addTri(icon,{cx-w*.11f,y+h*.22f,0},{cx+w*.11f,y+h*.22f,0},{cx,y+h*.98f,0},{.88f,.92f,.98f});
