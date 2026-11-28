@@ -1,35 +1,65 @@
-# Death_Craft
+# Death Craft
 
-A native Android voxel sandbox prototype built with C++20, Android NDK, CMake and OpenGL ES 3.0.
+Death Craft is a native Android voxel sandbox prototype built with **C++20**, the **Android NDK**, **CMake**, and **OpenGL ES 3.0**.
 
-## V0.1 prototype features
+## Features
 
-- First-person camera and a mobile player controller.
-- Touch joystick, swipe-to-look, jump, break and place controls.
-- Flat grass terrain generated in 16x16 block chunks.
-- Nearby chunks load around the player and distant chunks unload.
-- Visible-face voxel meshing to avoid drawing hidden cube faces.
-- Basic player collision with solid blocks and gravity/jumping.
-- Five-slot block hotbar (grass, dirt and stone block types).
-- Block edits are retained when chunks unload and reload during the current app session.
+- First-person voxel sandbox with touch controls.
+- Chunk-based terrain generation and configurable view distance.
+- Visible-face block meshing to avoid rendering hidden cube faces.
+- Block breaking and placement, with a five-slot hotbar.
+- Player movement, jumping, collision, gravity, and survival fall damage.
+- Health and armor HUD.
+- Player name and FPS display.
+- LAN multiplayer host/join prototype over UDP broadcast.
+- Textured sky, terrain blocks, water, and mobile control buttons.
+- World edits and player name are saved locally where supported by the current prototype.
 
 ## Touch controls
 
-- Left joystick: move.
-- Drag on the right side: rotate the camera.
-- Yellow round button: jump.
-- Blue button: place the selected block.
-- Red button: break the targeted block.
-- Bottom hotbar: select a block type.
-- Aim at a block with the center crosshair before placing or breaking.
+- **Left joystick:** move.
+- **Drag on the right side:** rotate the camera.
+- **Jump button:** jump.
+- **Red X:** break the targeted block.
+- **Blue button:** place the selected block.
+- **Bottom hotbar:** select a block type.
+- **Center crosshair:** aim at the block to edit.
+- **LAN JOIN / HOST:** select a multiplayer role from the menu/game UI.
 
-## Build on GitHub
+## Project structure
 
-The workflow in `.github/workflows/android-apk.yml` builds a debug APK for arm64-v8a and armeabi-v7a. Open the repository's **Actions** tab, select **Android APK**, and run the workflow manually, or push a commit to `main`. Download the generated APK from the workflow run's Artifacts section.
+Native game code is organized by responsibility under `app/src/main/cpp/`:
 
-## Current prototype limitations
+- `main.cpp`: Android NativeActivity entry point, shared game state, and class assembly.
+- `systems/lan.inc`: LAN socket setup and packet exchange.
+- `systems/graphics.inc`: OpenGL setup, shaders, and texture loading.
+- `systems/world.inc`: world data, save/load, terrain and block generation.
+- `systems/inventory.inc`: inventory and crafting operations.
+- `systems/chunk_render.inc`: chunk mesh generation and draw helpers.
+- `systems/player.inc`: player collision, movement, targeting, and block editing.
+- `systems/world_update.inc`: game simulation and frame update.
+- `systems/menu.inc`: main menu and menu rendering.
+- `stb_image.h`: image decoder used for texture assets.
 
-- Terrain is an infinite-style flat plane generated in chunks, not yet varied terrain.
-- Block edits are kept in memory only; there is no save file yet.
-- No crafting, enemies, inventory persistence, audio, or multiplayer yet.
-- Performance and device compatibility still need testing on physical Android phones.
+The `.inc` files are included inside the `Game` class. This keeps the existing class layout and behavior intact while separating implementation into smaller, responsibility-based files.
+
+## Build APK on GitHub
+
+The workflow at `.github/workflows/android-apk.yml` builds debug APKs for **arm64-v8a** and **armeabi-v7a**.
+
+1. Open the repository's **Actions** tab.
+2. Select **Android APK**.
+3. Run the workflow manually, or push a commit to `main`.
+4. Download the APK from the completed run's **Artifacts** section.
+
+## Current limitations
+
+- LAN multiplayer is an early prototype and currently targets local-network discovery.
+- World persistence and inventory persistence are still limited; test saving on the target device.
+- Terrain generation and rendering are still being developed.
+- Performance, multiplayer behavior, and device compatibility should be tested on physical Android devices.
+- There is no crafting progression, enemy ecosystem, or audio system comparable to a full commercial sandbox game yet.
+
+## Development
+
+Keep new code in the matching `systems/` file where possible. Shared state and class fields remain in `main.cpp` until a later refactor introduces dedicated headers and independently compiled translation units.
