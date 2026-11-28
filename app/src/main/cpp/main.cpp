@@ -91,8 +91,10 @@ class Game {
     float dayClock=0.0f,animationTime=0.0f;
     struct DroppedItem{uint8_t id=0;float x=0,y=0,z=0,vx=0,vy=0,vz=0,age=0;};
     struct BlockParticle{float x=0,y=0,z=0,vx=0,vy=0,vz=0,life=0;uint8_t id=0;};
+    struct PrimedTnt{float x=0,y=0,z=0,fuse=2.0f;};
     std::vector<DroppedItem> droppedItems;
     std::vector<BlockParticle> blockParticles;
+    std::vector<PrimedTnt> primedTnts;
     float khalilX=9.0f,khalilFeet=1.0f,khalilZ=0.0f,khalilFuse=0.0f,khalilRespawn=0.0f;
     bool khalilAlive=true,khalilPrimed=false;
     float explosionEffectTimer=0.0f,explosionX=0,explosionY=0,explosionZ=0;
@@ -161,7 +163,7 @@ public:
             else if(x>.65f&&y<-.43f){if(inWater()){vy=3.4f;grounded=false;fallTracking=false;}else if(grounded){vy=7.4f;grounded=false;fallStartFeet=feet;fallPeakFeet=feet;fallTracking=true;}}
             else if(x>.65f&&y>-.34f&&y<.12f){int tx,ty,tz,ax,ay,az;if(raycast(tx,ty,tz,ax,ay,az)){breaking=true;breakPointer=id;breakX=tx;breakY=ty;breakZ=tz;breakTimer=0;}}
             else if(x>.40f&&x<.66f&&y>-.54f&&y<-.25f)editBlock(true);
-            else if(x>.38f&&x<.64f&&y>-.22f&&y<.03f)attackGrafik();
+            else if(x>.38f&&x<.64f&&y>-.22f&&y<.03f)useTarget();
             else if(y<-.72f&&x>-.31f&&x<.31f)selected=std::clamp((int)((x+.31f)/.62f*5),0,4);
             else{lookId=id;lastX=x;lastY=y;}return 1;
         }
