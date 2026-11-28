@@ -38,9 +38,7 @@ jobs:
       - name: Format project C++ sources
         shell: bash
         run: |
-          find app/src/main/cpp -type f \\
-            \\( -name '*.cpp' -o -name '*.h' -o -name '*.hpp' -o -name '*.inc' \\) \\
-            ! -name 'stb_image.h' -print0 | xargs -0 -r clang-format -i
+          find app/src/main/cpp -type f \( -name '*.cpp' -o -name '*.h' -o -name '*.hpp' -o -name '*.inc' \) ! -name 'stb_image.h' -print0 | xargs -0 -r clang-format -i
 
       - name: Commit formatted sources
         run: |
