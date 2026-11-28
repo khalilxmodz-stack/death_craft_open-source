@@ -91,7 +91,7 @@ class Game {
     std::map<uint64_t,Chunk> chunks;
     std::map<std::tuple<int,int,int>,uint8_t> edits;
     float px=0,feet=1.0f,pz=0,yaw=0,pitch=0,vy=0;
-    float fallStartFeet=0;
+    float fallStartFeet=0,fallPeakFeet=0;
     bool fallTracking=false;
     bool grounded=false,running=false;
     float joyX=0,joyY=0,lastX=0,lastY=0,joyOriginX=-.76f,joyOriginY=-.65f;
@@ -329,30 +329,7 @@ class Game {
     int inventorySlotAt(float x,float y)const{for(int r=0;r<4;r++)for(int c=0;c<5;c++){float bx=-.58f+c*.235f,by=.30f-r*.245f;if(x>=bx&&x<=bx+.19f&&y>=by-.19f&&y<=by+.02f)return r*5+c;}return -1;}
     void rebuild(Chunk&c){
         c.mesh.clear();c.shadowMesh.clear();int ox=c.cx*CS,oz=c.cz*CS;
-        // Soft projected tree shadows, rebuilt only when the chunk mesh changes.
-        for(int y=1;y<HEIGHT-1;y++)for(int z=1;z<CS-1;z++)for(int x=1;x<CS-1;x++){
-            if(c.get(x,y,z)!=4||c.get(x,y-1,z)==4)continue;
-            float sx=(float)(ox+x)+1.35f,sz=(float)(oz+z)+.85f;
-            const int segments=16;const float outerRings[3]={1.18f,1.0f,.72f};
-            const float innerRings[3]={1.0f,.72f,.42f};
-            const float shades[3]={.13f,.18f,.22f};
-            for(int ring=0;ring<3;ring++){
-                float r0=innerRings[ring],r1=outerRings[ring];
-                V3 col{shades[ring],shades[ring],shades[ring]};
-                for(int k=0;k<segments;k++){
-                    float a0=2*PI*k/segments,a1=2*PI*(k+1)/segments;
-                    float x0=sx+std::cos(a0)*1.75f*r0,z0=sz+std::sin(a0)*.88f*r0;
-                    float x1=sx+std::cos(a1)*1.75f*r0,z1=sz+std::sin(a1)*.88f*r0;
-                    float xo0=sx+std::cos(a0)*1.75f*r1,zo0=sz+std::sin(a0)*.88f*r1;
-                    float xo1=sx+std::cos(a1)*1.75f*r1,zo1=sz+std::sin(a1)*.88f*r1;
-                    V3 p0{x0,(float)groundHeight((int)std::floor(x0),(int)std::floor(z0))+.018f,z0};
-                    V3 p1{x1,(float)groundHeight((int)std::floor(x1),(int)std::floor(z1))+.018f,z1};
-                    V3 q0{xo0,(float)groundHeight((int)std::floor(xo0),(int)std::floor(zo0))+.018f,zo0};
-                    V3 q1{xo1,(float)groundHeight((int)std::floor(xo1),(int)std::floor(zo1))+.018f,zo1};
-                    addTri(c.shadowMesh,p0,p1,q1,col);addTri(c.shadowMesh,p0,q1,q0,col);
-                }
-            }
-        }
+        // Classic block shading only; projected soft tree-shadow meshes removed.
         for(int y=0;y<HEIGHT;y++)for(int z=0;z<CS;z++)for(int x=0;x<CS;x++){
             uint8_t b=c.get(x,y,z);if(!b)continue;
             float X=(float)(ox+x),Y=(float)y,Z=(float)(oz+z);
@@ -382,9 +359,9 @@ class Game {
         auto rect=[&](float x,float y,float w,float h,V3 c){t(x,y,x+w,y,x+w,y+h,c);t(x,y,x+w,y+h,x,y+h,c);};
         auto circ=[&](float x,float y,float r,V3 c){for(int i=0;i<32;i++){float a=i*2*PI/32,b=(i+1)*2*PI/32;t(x,y,x+cosf(a)*r,y+sinf(a)*r,x+cosf(b)*r,y+sinf(b)*r,c);}};
         auto line=[&](float x,float y,float X,float Y,float q,V3 c){float dx=X-x,dy=Y-y,l=sqrtf(dx*dx+dy*dy);if(l<.001f)return;float ox=-dy/l*q,oy=dx/l*q;t(x+ox,y+oy,X+ox,Y+oy,X-ox,Y-oy,c);t(x+ox,y+oy,X-ox,Y-oy,x-ox,y-oy,c);};
-        rect(-.94f,.57f,.20f,.12f,lanMode==1?V3{.12f,.55f,.20f}:V3{.04f,.04f,.05f});
-        rect(-.70f,.57f,.20f,.12f,lanMode==2?V3{.12f,.35f,.65f}:V3{.04f,.04f,.05f});
-        drawText("HOST",-.91f,.61f,.012f,{1,1,1});drawText("JOIN",-.67f,.61f,.012f,{1,1,1});
+        rect(-.94f,-.985f,.20f,.075f,lanMode==2?V3{.12f,.58f,.22f}:V3{.05f,.28f,.11f});
+        rect(-.70f,-.985f,.20f,.075f,lanMode==1?V3{.12f,.40f,.78f}:V3{.06f,.20f,.42f});
+        drawText("JOIN",-.91f,-.925f,.012f,{1,1,1});drawText("HOST",-.67f,-.925f,.012f,{1,1,1});
         drawText("FPS:"+std::to_string((int)fpsValue),.63f,.68f,.018f,{1,1,1});
         circ(joyOriginX,joyOriginY,.255f,{.01f,.01f,.015f});circ(joyOriginX,joyOriginY,.22f,{.14f,.14f,.16f});circ(joyOriginX+joyX*.16f,joyOriginY+joyY*.16f,.105f,{.01f,.01f,.015f});
         circ(.78f,-.62f,.14f,{.01f,.01f,.015f});circ(.78f,-.62f,.115f,{.17f,.17f,.19f});
@@ -454,10 +431,11 @@ class Game {
     }
     void drawText(const std::string&str,float x,float y,float scale,V3 color){
         if(str.empty())return;
-        const float maxWidth=1.82f,maxHeight=.19f;
-        float effective=std::min(scale,std::min(maxWidth/(6.0f*str.size()),maxHeight/7.0f));
+        const float maxWidth=1.72f;
+        float effective=std::min(std::min(scale,.016f),maxWidth/(6.0f*str.size()));
         float textWidth=effective*6.0f*str.size();
         x=std::clamp(x,-.97f,.97f-textWidth);
+        y=std::clamp(y,-.82f+6.0f*effective,.96f);
         scale=effective;
         std::vector<float> v;float cursor=x;
         for(char c:str){if(c>='a'&&c<='z')c=(char)(c-'a'+'A');auto g=glyph(c);for(int row=0;row<7;row++)for(int col=0;col<5;col++)if(g[row]&(1<<(4-col))){
@@ -565,24 +543,24 @@ class Game {
         if(!playerDead){
         float forward=joyY,side=joyX,mag=std::sqrt(forward*forward+side*side);if(mag>1){forward/=mag;side/=mag;}
         bool swimming=inWater();float speed=swimming?2.8f:5.2f;movePlayer((std::sin(yaw)*forward+std::cos(yaw)*side)*speed*dt,(-std::cos(yaw)*forward+std::sin(yaw)*side)*speed*dt);
-        if(swimming){grounded=false;vy-=2.0f*dt;if(feet+1.2f<SEA_LEVEL)vy+=5.0f*dt;vy*=.94f;vy=std::clamp(vy,-2.0f,3.0f);feet+=vy*dt;}
-        else {if(grounded&&!supported()){grounded=false;fallStartFeet=feet;fallTracking=true;}}
-        if(!grounded&&!swimming){vy-=22*dt;float next=feet+vy*dt;if(vy<=0){int bx=(int)std::floor(px),bz=(int)std::floor(pz),by=(int)std::floor(next-.01f);
+        if(swimming){grounded=false;fallTracking=false;vy-=2.0f*dt;if(feet+1.2f<SEA_LEVEL)vy+=5.0f*dt;vy*=.94f;vy=std::clamp(vy,-2.0f,3.0f);feet+=vy*dt;}
+        else {if(grounded&&!supported()){grounded=false;fallStartFeet=feet;fallPeakFeet=feet;fallTracking=true;}}
+        if(!grounded&&!swimming){fallPeakFeet=std::max(fallPeakFeet,feet);vy-=22*dt;float next=feet+vy*dt;if(vy<=0){int bx=(int)std::floor(px),bz=(int)std::floor(pz),by=(int)std::floor(next-.01f);
             if(solid(bx,by,bz)||solid((int)std::floor(px-.25f),by,(int)std::floor(pz-.25f))||
                solid((int)std::floor(px+.25f),by,(int)std::floor(pz+.25f))||
                solid((int)std::floor(px-.25f),by,(int)std::floor(pz+.25f))||
                solid((int)std::floor(px+.25f),by,(int)std::floor(pz-.25f))){
                 next=by+1;vy=0;grounded=true;
                 if(fallTracking){
-                    float fallDistance=fallStartFeet-next;
+                    float fallDistance=std::max(0.0f,fallPeakFeet-next);
                     if(!creativeMode&&fallDistance>6.0f){
-                        int damage=std::max(1,(int)std::floor(fallDistance-5.0f));
+                        int damage=std::max(1,(int)std::floor(fallDistance-3.0f));
                         int absorbed=std::min(armor,damage);armor-=absorbed;damage-=absorbed;
                         health=std::max(0,health-damage);
                         if(health<=0){playerDead=true;swallowTimer=.001f;}
                         else {status="FALL DAMAGE";statusFrames=90;}
                     }
-                    fallTracking=false;
+                    fallTracking=false;fallPeakFeet=next;
                 }
             }}
             else if(vy>0){int by=(int)std::floor(next+1.8f);if(solid((int)std::floor(px),by,(int)std::floor(pz))){next=by-1.8f;vy=0;}}
@@ -597,7 +575,6 @@ class Game {
         updateWorld();
         glViewport(0,0,width,height);glClearColor(.48f,.74f,.96f,1);glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
         Mat4 vp=mul(perspective(1.02f,(float)width/height,.1f,240),camera(px,feet+1.62f,pz,yaw,pitch));
-        for(auto&entry:chunks)draw(entry.second.shadowMesh,GL_TRIANGLES,vp,px,feet+1.62f,pz,true,false);
         for(auto&entry:chunks)draw(entry.second.mesh,GL_TRIANGLES,vp,px,feet+1.62f,pz,true,true);
         std::vector<float> clouds;
         auto cloudCube=[&](float x,float y,float z,float w,float h,float d){V3 a{x,y,z},b{x+w,y,z},c{x+w,y+h,z},dd{x,y+h,z},e{x,y,z+d},ff{x+w,y,z+d},g{x+w,y+h,z+d},hh{x,y+h,z+d};V3 col{.94f,.97f,1.0f};addFace(clouds,a,b,c,dd,col);addFace(clouds,ff,e,hh,g,col);addFace(clouds,e,a,dd,hh,col);addFace(clouds,b,ff,g,c,col);addFace(clouds,dd,c,g,hh,col);addFace(clouds,e,ff,b,a,col);};
@@ -662,10 +639,11 @@ class Game {
         button(-.24f,-.70f,.48f,.22f,{.12f,.42f,.68f});
         button(-.45f,.47f,.90f,.11f,{.08f,.22f,.30f});draw(b,GL_TRIANGLES,identity(),0,0,0,false);
         drawText("NAME: "+playerName,-.40f,.51f,.017f,{1,1,1});
-        drawText("CREATIVE",-.55f,.405f,.017f,{1,1,1});drawText("SURVIVAL",.10f,.405f,.017f,{1,1,1});drawText("FLAT",-.48f,.105f,.022f,{1,1,1});drawText("NORMAL",.10f,.105f,.018f,{1,1,1});
-        for(int i=0;i<3;i++)drawText("SLOT "+std::to_string(i+1),-.59f+i*.44f,-.30f,.014f,{1,1,1});
-        drawText("START",-.15f,-.63f,.025f,{1,1,1});drawText("MODE",-.08f,.60f,.018f,{.8f,.85f,.9f});
-        if(nameEditing){std::vector<float> kb;addFace(kb,{-.72f,-.62f,0},{.72f,-.62f,0},{.72f,.40f,0},{-.72f,.40f,0},{.025f,.04f,.06f});draw(kb,GL_TRIANGLES,identity(),0,0,0,false);drawText("TYPE YOUR NAME",-.28f,.34f,.018f,{.5f,.85f,1});const char* rows[]={"ABCDEFG","HIJKLMN","OPQRSTU","VWXYZ"};for(int r=0;r<4;r++)for(int c=0;rows[r][c];c++)drawText(std::string(1,rows[r][c]),-.61f+c*.19f,.19f-r*.20f,.025f,{1,1,1});drawText("DONE",-.10f,-.53f,.025f,{.5f,1,.6f});drawText("DEL",.38f,-.53f,.025f,{1,.55f,.45f});}drawText("WORLD TYPE",-.20f,.28f,.018f,{.8f,.85f,.9f});drawText("SAVE SLOT",-.18f,-.12f,.018f,{.8f,.85f,.9f});glEnable(GL_DEPTH_TEST);
+        drawText("CREATIVE",-.55f,.49f,.016f,{1,1,1});drawText("SURVIVAL",.10f,.49f,.016f,{1,1,1});
+        drawText("FLAT",-.48f,.19f,.016f,{1,1,1});drawText("NORMAL",.10f,.19f,.016f,{1,1,1});
+        for(int i=0;i<3;i++)drawText("SLOT "+std::to_string(i+1),-.59f+i*.44f,-.22f,.014f,{1,1,1});
+        drawText("START",-.15f,-.55f,.016f,{1,1,1});drawText("MODE",-.08f,.60f,.016f,{.8f,.85f,.9f});
+        if(nameEditing){std::vector<float> kb;addFace(kb,{-.72f,-.62f,0},{.72f,-.62f,0},{.72f,.40f,0},{-.72f,.40f,0},{.025f,.04f,.06f});draw(kb,GL_TRIANGLES,identity(),0,0,0,false);drawText("TYPE YOUR NAME",-.28f,.34f,.018f,{.5f,.85f,1});const char* rows[]={"ABCDEFG","HIJKLMN","OPQRSTU","VWXYZ"};for(int r=0;r<4;r++)for(int c=0;rows[r][c];c++)drawText(std::string(1,rows[r][c]),-.61f+c*.19f,.19f-r*.20f,.025f,{1,1,1});drawText("DONE",-.10f,-.53f,.025f,{.5f,1,.6f});drawText("DEL",.38f,-.53f,.025f,{1,.55f,.45f});}drawText("WORLD TYPE",-.20f,.27f,.014f,{.8f,.85f,.9f});drawText("SAVE SLOT",-.18f,-.12f,.014f,{.8f,.85f,.9f});glEnable(GL_DEPTH_TEST);
     }
     void setJoy(float x,float y){joyX=std::clamp((x-joyOriginX)/.20f,-1.0f,1.0f);joyY=std::clamp((y-joyOriginY)/.20f,-1.0f,1.0f);}
 public:
@@ -683,11 +661,11 @@ public:
         if(action==AMOTION_EVENT_ACTION_DOWN||action==AMOTION_EVENT_ACTION_POINTER_DOWN){
             if(!inWorld){if(nameEditing){if(y<-.43f){if(x>.25f){if(!playerName.empty())playerName.pop_back();savePlayerName();}else{nameEditing=false;savePlayerName();}return 1;}int row=std::clamp((int)((.25f-y)/.20f),0,3);const char* rows[]={"ABCDEFG","HIJKLMN","OPQRSTU","VWXYZ"};int col=std::clamp((int)((x+.70f)/.19f),0,6);if(rows[row][col]&&playerName.size()<16){playerName.push_back(rows[row][col]);savePlayerName();}return 1;}if(y>.44f&&y<.60f){nameEditing=true;return 1;}if(y>.32f){creativeMode=x<0;return 1;}if(y>.02f&&y<.27f){flatWorld=x<0;return 1;}if(y>-.40f&&y<-.12f){selectedSlot=std::clamp((int)((x+.62f)/.44f),0,2);return 1;}if(y<-.52f){startWorld();return 1;}return 1;}
             if(inventoryOpen){if(x>.62f&&y>.55f){inventoryOpen=false;dragIndex=-1;return 1;}if(x>.55f&&x<.80f&&y>.20f&&y<.43f){craft(0);return 1;}if(x>.55f&&x<.80f&&y>-.08f&&y<.16f){craft(1);return 1;}if(x>.55f&&x<.80f&&y>-.38f&&y<-.12f){craft(2);return 1;}int slot=inventorySlotAt(x,y);if(slot>=0){dragIndex=slot;dragPointer=id;}return 1;}
-            if(x>-.95f&&x<-.72f&&y>.55f&&y<.73f){setLanMode(1);return 1;}
-            if(x>-.72f&&x<-.47f&&y>.55f&&y<.73f){setLanMode(2);return 1;}
+            if(x>-.95f&&x<-.72f&&y<-.90f){setLanMode(2);return 1;}
+            if(x>-.70f&&x<-.47f&&y<-.90f){setLanMode(1);return 1;}
             if(x>.81f&&y>.72f){inventoryOpen=true;joyId=lookId=-1;joyX=joyY=0;breaking=false;return 1;}
-            if(x<-.42f&&y<0){joyId=id;joyOriginX=x;joyOriginY=y;setJoy(x,y);}
-            else if(x>.65f&&y<-.43f){if(inWater()){vy=3.4f;grounded=false;fallTracking=false;}else if(grounded){vy=7.4f;grounded=false;fallStartFeet=feet;fallTracking=true;}}
+            if(x<-.42f&&y<0&&y>-.88f){joyId=id;joyOriginX=x;joyOriginY=y;setJoy(x,y);}
+            else if(x>.65f&&y<-.43f){if(inWater()){vy=3.4f;grounded=false;fallTracking=false;}else if(grounded){vy=7.4f;grounded=false;fallStartFeet=feet;fallPeakFeet=feet;fallTracking=true;}}
             else if(x>.65f&&y>-.34f&&y<.12f){int tx,ty,tz,ax,ay,az;if(raycast(tx,ty,tz,ax,ay,az)){breaking=true;breakPointer=id;breakX=tx;breakY=ty;breakZ=tz;breakTimer=0;}}
             else if(x>.40f&&x<.66f&&y>-.54f&&y<-.25f)editBlock(true);
             else if(x>.38f&&x<.64f&&y>-.22f&&y<.03f)attackGrafik();
