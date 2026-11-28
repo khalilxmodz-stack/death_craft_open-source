@@ -44,6 +44,7 @@
             inventory[4]=creativeMode?Item{10,999999}:Item{10,4};inventory[5]=creativeMode?Item{6,999999}:Item{6,8};
             inventory[6]=creativeMode?Item{7,999999}:Item{7,0};inventory[7]=creativeMode?Item{8,999999}:Item{8,0};inventory[8]=creativeMode?Item{5,999999}:Item{5,8};inventory[9]=creativeMode?Item{11,999999}:Item{11,1};inventory[10]=creativeMode?Item{12,999999}:Item{12,1};inventory[11]=Item{20,4};
         }
+        if(itemCount(20)==0)addItem(20,4);
         if(creativeMode)for(auto&i:inventory)if(i.id)i.count=999999;
         grafikX=6;grafikZ=-5;grafikFeet=(float)groundHeight(6,-5);skeletonX=px+8.0f;skeletonZ=pz+5.0f;skeletonFeet=(float)groundHeight((int)skeletonX,(int)skeletonZ);skeletonYaw=0;skeletonShootTimer=1.4f;skeletonHealth=8;skeletonAlive=true;skeletonHitTimer=0;skeletonRespawn=0;skeletonArrows.clear();khalilX=px+9.0f;khalilZ=pz+4.0f;khalilFeet=(float)groundHeight((int)khalilX,(int)khalilZ);khalilAlive=true;khalilHealth=8;khalilHitTimer=0;khalilPrimed=false;khalilFuse=0;khalilRespawn=0;explosionEffectTimer=0;deathMessage="GRAFIK ATE YOU";selected=0;inWorld=true;saveTimer=0;updateWorld();status=loaded?"WORLD LOADED":"WORLD CREATED";statusFrames=120;
     }
