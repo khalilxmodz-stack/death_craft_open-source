@@ -333,10 +333,11 @@ class Game {
         for(int y=1;y<HEIGHT-1;y++)for(int z=1;z<CS-1;z++)for(int x=1;x<CS-1;x++){
             if(c.get(x,y,z)!=4||c.get(x,y-1,z)==4)continue;
             float sx=(float)(ox+x)+1.35f,sz=(float)(oz+z)+.85f;
-            const int segments=16;const float rings[3]={1.0f,.72f,.42f};
+            const int segments=16;const float outerRings[3]={1.18f,1.0f,.72f};
+            const float innerRings[3]={1.0f,.72f,.42f};
             const float shades[3]={.13f,.18f,.22f};
             for(int ring=0;ring<3;ring++){
-                float r0=rings[ring],r1=ring==0?1.18f:rings[ring-1];
+                float r0=innerRings[ring],r1=outerRings[ring];
                 V3 col{shades[ring],shades[ring],shades[ring]};
                 for(int k=0;k<segments;k++){
                     float a0=2*PI*k/segments,a1=2*PI*(k+1)/segments;
