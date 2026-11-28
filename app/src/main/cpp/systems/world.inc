@@ -1,11 +1,18 @@
 // Subsystem: World data, terrain generation, persistence, block lookup, and collision helpers.
 // Function comments describe each method's responsibility and its place in the game systems.
 
+    // Returns the terrain surface height, respecting flat-world mode.
     int groundHeight(int x,int z)const{return flatWorld?8:terrainHeight(x,z);}
+    // Checks whether the player's body intersects a water block.
+    // Looks up a block at world coordinates, including generated chunks.
     bool inWater()const{int x=(int)std::floor(px),z=(int)std::floor(pz);for(int y=(int)std::floor(feet+.15f);y<=(int)std::floor(feet+1.65f);y++)if(blockAt(x,y,z)==9)return true;return false;}
+    // Builds the save-file path for the selected world slot.
     std::string savePath()const{return saveDirectory+"/deathcraft_world_"+std::to_string(selectedSlot)+".dat";}
+    // Writes the current player name to app storage.
     void savePlayerName()const{if(saveDirectory.empty())return;std::ofstream out(saveDirectory+"/deathcraft_player_name.txt",std::ios::trunc);if(out)out<<playerName;}
+    // Loads and validates the saved player name.
     void loadPlayerName(){if(saveDirectory.empty())return;std::ifstream in(saveDirectory+"/deathcraft_player_name.txt");std::string value;if(std::getline(in,value)&&!value.empty()){if(value.size()>16)value.resize(16);playerName=value;}}
+    // Serializes world settings, player state, and edited blocks to disk.
     void saveWorld(){
         if(!inWorld||saveDirectory.empty())return;
         std::ofstream out(savePath(),std::ios::binary|std::ios::trunc);if(!out)return;
@@ -18,6 +25,7 @@
         out.write((char*)&count,4);
         for(const auto&e:edits){int32_t x=std::get<0>(e.first),y=std::get<1>(e.first),z=std::get<2>(e.first);uint8_t b=e.second;out.write((char*)&x,4);out.write((char*)&y,4);out.write((char*)&z,4);out.write((char*)&b,1);}
     }
+    // Restores a saved world and its persisted player and block data.
     bool loadWorld(){
         std::ifstream in(savePath(),std::ios::binary);if(!in)return false;
         char magic[8]{};in.read(magic,8);if(!in||std::memcmp(magic,"DCWORLD1",8)!=0)return false;
@@ -31,7 +39,9 @@
         edits.clear();for(uint32_t i=0;i<count;i++){int32_t x,y,z;uint8_t b;in.read((char*)&x,4);in.read((char*)&y,4);in.read((char*)&z,4);in.read((char*)&b,1);if(!in)return false;edits[{x,y,z}]=b;}
         creativeMode=mode!=0;spectatorMode=false;flatWorld=flat!=0;if(version==1)feet=(float)groundHeight((int)std::floor(px),(int)std::floor(pz));health=std::clamp(hp,0,10);armor=std::clamp(ap,0,10);selected=std::clamp(sel,0,4);return true;
     }
+    // Switches between the supported player game modes.
     void cycleGameMode(){if(!creativeMode&&!spectatorMode){creativeMode=true;spectatorMode=false;status="CREATIVE MODE";}else if(creativeMode){creativeMode=false;spectatorMode=true;status="SPECTATOR MODE";}else{creativeMode=false;spectatorMode=false;status="SURVIVAL MODE";}if(creativeMode)for(auto&i:inventory)if(i.id)i.count=999999;statusFrames=90;}
+    // Initializes a new world or loads the selected saved world.
     void startWorld(){
         for(auto&entry:chunks)if(entry.second.meshVbo)glDeleteBuffers(1,&entry.second.meshVbo);
         chunks.clear();dirtyChunkQueue.clear();edits.clear();waterFlowDepth.clear();waterSimulationTimer=0;inventory={};health=10;armor=10;grafikHealth=6;grafikHitTimer=0;grafikAlive=true;playerDead=false;swallowTimer=0;
@@ -55,6 +65,7 @@
         int cx=floorDiv(x,CS),cz=floorDiv(z,CS);auto it=chunks.find(chunkKey(cx,cz));
         return it==chunks.end()?0:it->second.get(modp(x,CS),y,modp(z,CS));
     }
+    // Adds one textured block face to a mesh vertex buffer.
     void addBlockFace(std::vector<float>&v,V3 a,V3 b,V3 c,V3 d,uint8_t block,int face,int gx,int gy,int gz,float blockLight=-1.0f){
         int tile=block==11?6:(block==10?5:(block==9?4:(block==3?2:(block==5?3:(block==4?7:(block==13?8:(block==14?9:(block==8?10:((block==1&&face==2)?0:1)))))))));
         float u0=(tile+.012f)/12.0f,u1=(tile+.988f)/12.0f,v0=.012f,v1=.988f;
@@ -62,11 +73,13 @@
         float light=shade[face]*(blockLight>=0.0f?blockLight:1.0f);V3 color=block==18?V3{light,.20f*light,.24f*light}:((block==10||block==13||block==14||block==8)?V3{light,light,light}:(block==9?V3{.22f*light,.52f*light,.88f*light}:V3{light,light,light}));
         addTri(v,a,b,c,color,u0,v0,u1,v0,u1,v1);addTri(v,a,c,d,color,u0,v0,u1,v1,u0,v1);
     }
+    // Determines whether a block obstructs player or mob movement.
     bool solid(int x,int y,int z){
         int cx=floorDiv(x,CS),cz=floorDiv(z,CS);auto it=chunks.find(chunkKey(cx,cz));
         if(it==chunks.end())return y<0;
         uint8_t b=it->second.get(modp(x,CS),y,modp(z,CS));return b!=0&&b!=9;
     }
+    // Finds a nearby walkable surface for a moving mob.
     float mobSurfaceHeight(float x,float z,float referenceFeet){
         int bx=(int)std::floor(x),bz=(int)std::floor(z);
         int top=std::min(HEIGHT-2,(int)std::floor(referenceFeet)+1);
@@ -75,6 +88,7 @@
             if(solid(bx,y,bz)&&!solid(bx,y+1,bz)&&!solid(bx,y+2,bz))return (float)(y+1);
         return -1000.0f;
     }
+    // Checks whether a mob can occupy a candidate position.
     bool mobCanStandAt(float x,float feetY,float z,float radius,float bodyHeight){
         int minY=(int)std::floor(feetY+.04f),maxY=(int)std::floor(feetY+bodyHeight-.04f);
         const float offsets[3]={-radius,0.0f,radius};
@@ -83,23 +97,27 @@
                 if(solid((int)std::floor(x+ox),(int)yi,(int)std::floor(z+oz)))return false;
         return true;
     }
+    // Attempts to move a mob up a small ledge without collision.
     bool mobTryStep(float x,float z,float oldFeet,float radius,float bodyHeight,float& newFeet){
         float surface=mobSurfaceHeight(x,z,oldFeet);
         if(surface<0.0f||std::abs(surface-oldFeet)>1.05f)return false;
         if(!mobCanStandAt(x,surface,z,radius,bodyHeight))return false;
         newFeet=surface;return true;
     }
+    // Moves a mob while following terrain and avoiding solid blocks.
     void moveMobOnBlocks(float& x,float& z,float& feetY,float nx,float nz,float radius,float bodyHeight){
         float nextFeet=feetY;
         if(mobTryStep(nx,nz,feetY,radius,bodyHeight,nextFeet)){x=nx;z=nz;feetY=nextFeet;return;}
         if(mobTryStep(nx,z,feetY,radius,bodyHeight,nextFeet)){x=nx;feetY=nextFeet;}
         if(mobTryStep(x,nz,feetY,radius,bodyHeight,nextFeet)){z=nz;feetY=nextFeet;}
     }
+    // Queues a chunk for mesh rebuilding after its contents change.
     void markChunkDirty(int cx,int cz){
         auto it=chunks.find(chunkKey(cx,cz));
         if(it==chunks.end())return;
         if(!it->second.dirty){it->second.dirty=true;dirtyChunkQueue.push_back(chunkKey(cx,cz));}
     }
+    // Marks the affected chunk and neighboring chunk edges for refresh.
     void markBlockDirty(int x,int y,int z){
         (void)y;
         const int cx=floorDiv(x,CS),cz=floorDiv(z,CS),lx=modp(x,CS),lz=modp(z,CS);
@@ -113,6 +131,7 @@
         if(lx==CS-1&&lz==0)markChunkDirty(cx+1,cz-1);
         if(lx==CS-1&&lz==CS-1)markChunkDirty(cx+1,cz+1);
     }
+    // Generates terrain and natural features for one chunk.
     void generate(Chunk&c){
         int ox=c.cx*CS,oz=c.cz*CS;
         for(int z=0;z<CS;z++)for(int x=0;x<CS;x++){
@@ -192,6 +211,7 @@
         }
         c.dirty=true;
     }
+    // Returns an existing chunk or generates it when missing.
     Chunk& ensureChunk(int cx,int cz){
         uint64_t k=chunkKey(cx,cz);auto it=chunks.find(k);
         if(it==chunks.end()){
@@ -201,9 +221,11 @@
         }
         return it->second;
     }
+    // Returns the fallback display color associated with a block ID.
     V3 blockColor(uint8_t b,int face){
         if(b==19)return{.12f,.12f,.14f};if(b==9)return{.12f,.42f,.82f};if(b==1){if(face==2)return{.22f,.68f,.18f};return{.42f,.29f,.16f};}
         if(b==2)return{.48f,.31f,.17f};if(b==3)return{.43f,.45f,.48f};
         if(b==4)return{.43f,.27f,.12f};if(b==5)return{.12f,.48f,.13f};if(b==6)return{.67f,.46f,.24f};if(b==13)return{.72f,.68f,.62f};if(b==14)return{.78f,.80f,.83f};if(b==8)return{.70f,.48f,.25f};if(b==10||b==11)return{1,1,1};if(b==18)return{.92f,.20f,.24f};return{.72f,.62f,.35f};
     }
+    // Calculates mining time from the selected tool and target block.
     float breakDuration(uint8_t b)const{uint8_t tool=selected>=0&&selected<(int)inventory.size()&&inventory[selected].count>0?inventory[selected].id:0;bool ironPick=tool==12,woodPick=tool==16,axe=tool==15;if((ironPick||woodPick)&&b==3)return ironPick?.24f:.95f;if(ironPick&&b==13)return .38f;if(axe&&b==4)return .28f;if((ironPick||woodPick)&&b==2)return ironPick?.30f:.70f;switch(b){case 1:return .65f;case 2:return .90f;case 3:return 2.10f;case 4:return 1.25f;case 5:return .30f;case 6:return 1.10f;case 8:return .90f;case 10:return .25f;case 11:return .25f;case 13:return 2.8f;case 14:return 3.0f;default:return .85f;}}
