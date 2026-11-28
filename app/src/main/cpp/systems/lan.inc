@@ -36,7 +36,7 @@
                 }
             }
             else if(p.type==7&&lanMode==2){if(p.flags&1){grafikHealth=p.block;grafikAlive=grafikHealth>0;grafikHitTimer=.28f;}else{khalilHealth=p.block;khalilAlive=khalilHealth>0;khalilHitTimer=.28f;}}
-            else if(p.type==8){DroppedItem item{};item.id=p.block;item.x=p.x;item.y=p.y;item.z=p.z;droppedItems.push_back(item);}
+            else if(p.type==8){DroppedItem item{};item.id=p.block;item.count=std::max(1,(int)p.flags);item.x=p.x;item.y=p.y;item.z=p.z;droppedItems.push_back(item);}
             else if(p.type==9){for(auto it=droppedItems.begin();it!=droppedItems.end();){float dx=it->x-p.x,dy=it->y-p.y,dz=it->z-p.z;if(dx*dx+dy*dy+dz*dz<.36f&&it->id==p.block){it=droppedItems.erase(it);break;}++it;}}
             else if(p.type==5&&lanMode==2){
                 explosionX=p.x;explosionY=p.y;explosionZ=p.z;explosionEffectTimer=.62f;
