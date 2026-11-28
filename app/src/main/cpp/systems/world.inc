@@ -26,12 +26,13 @@
         for(auto&i:inventory){int32_t n=0;in.read((char*)&i.id,1);in.read((char*)&n,4);i.count=std::clamp(n,0,999999);}
         in.read((char*)&count,4);if(!in||count>2000000)return false;
         edits.clear();for(uint32_t i=0;i<count;i++){int32_t x,y,z;uint8_t b;in.read((char*)&x,4);in.read((char*)&y,4);in.read((char*)&z,4);in.read((char*)&b,1);if(!in)return false;edits[{x,y,z}]=b;}
-        creativeMode=mode!=0;flatWorld=flat!=0;health=std::clamp(hp,0,10);armor=std::clamp(ap,0,10);selected=std::clamp(sel,0,4);return true;
+        creativeMode=mode!=0;spectatorMode=false;flatWorld=flat!=0;health=std::clamp(hp,0,10);armor=std::clamp(ap,0,10);selected=std::clamp(sel,0,4);return true;
     }
+    void cycleGameMode(){if(!creativeMode&&!spectatorMode){creativeMode=true;spectatorMode=false;status="CREATIVE MODE";}else if(creativeMode){creativeMode=false;spectatorMode=true;status="SPECTATOR MODE";}else{creativeMode=false;spectatorMode=false;status="SURVIVAL MODE";}if(creativeMode)for(auto&i:inventory)if(i.id)i.count=999999;statusFrames=90;}
     void startWorld(){
         chunks.clear();edits.clear();waterFlowDepth.clear();waterSimulationTimer=0;inventory={};health=10;armor=10;grafikHealth=6;grafikHitTimer=0;grafikAlive=true;playerDead=false;swallowTimer=0;
         px=0;pz=0;yaw=0;pitch=0;vy=0;feet=(float)groundHeight(0,0);grounded=true;
-        bool loaded=loadWorld();
+        bool loaded=loadWorld();spectatorMode=false;
         if(loaded){bool hasTnt=false,hasSword=false,hasPickaxe=false;for(const auto&i:inventory){if(i.id==10&&i.count>0)hasTnt=true;if(i.id==11&&i.count>0)hasSword=true;if(i.id==12&&i.count>0)hasPickaxe=true;}if(!hasTnt){if(inventory[4].id==5)inventory[8]=inventory[4];inventory[4]=Item{10,creativeMode?999999:4};}if(!hasSword)inventory[9]=Item{11,creativeMode?999999:1};if(!hasPickaxe)addItem(12,creativeMode?999999:1);}
         if(!loaded){
             px=0;pz=0;
@@ -59,7 +60,7 @@
                 for(int dy=2;dy<=5;dy++)if(blockAt(gx+dx,gy+dy,gz+dz)==5){underTree=true;break;}
             if(underTree)light*=.52f;
         }
-        V3 color=(block==10||block==13||block==14||block==8)?V3{1,1,1}:(block==9?V3{.22f*light,.52f*light,.88f*light}:V3{light,light,light});
+        bool skyVisible=true;for(int sy=gy+1;sy<HEIGHT;sy++)if(solid(gx,sy,gz)){skyVisible=false;break;}float ambient=skyVisible?1.0f:.24f;int occlusion=0;const int ox4[4]={-1,1,0,0},oz4[4]={0,0,-1,1};for(int n=0;n<4;n++)if(solid(gx+ox4[n],gy,gz+oz4[n]))occlusion++;light*=std::max(.18f,ambient*(1.0f-occlusion*.10f));V3 color=(block==10||block==13||block==14||block==8)?V3{light,light,light}:(block==9?V3{.22f*light,.52f*light,.88f*light}:V3{light,light,light});
         addTri(v,a,b,c,color,u0,v0,u1,v0,u1,v1);addTri(v,a,c,d,color,u0,v0,u1,v1,u0,v1);
     }
     bool solid(int x,int y,int z){
@@ -82,7 +83,16 @@
             }
             if(h<SEA_LEVEL)for(int y=h;y<SEA_LEVEL;y++)c.set(x,y,z,9);
         }
-        auto put=[&](int x,int y,int z,uint8_t id){if(floorDiv(x,CS)==c.cx&&floorDiv(z,CS)==c.cz)c.set(modp(x,CS),y,modp(z,CS),id);};
+        auto put=[&](int x,int y,int z,uint8_t id){if(floorDiv(x,CS)==c.cx&&floorDiv(z,CS)==c.cz&&y>=0&&y<HEIGHT)c.set(modp(x,CS),y,modp(z,CS),id);};
+        const int caveCell=52;
+        for(int gz=floorDiv(oz-55,caveCell);gz<=floorDiv(oz+CS+55,caveCell);gz++)for(int gx=floorDiv(ox-55,caveCell);gx<=floorDiv(ox+CS+55,caveCell);gx++){
+            uint32_t seed=terrainHash(gx*71+193,gz*97-251);if(seed%5u!=0u)continue;
+            int ex=gx*caveCell+8+(int)((seed>>8)%36u),ez=gz*caveCell+8+(int)((seed>>16)%36u),surface=groundHeight(ex,ez);if(surface<SEA_LEVEL+2||surface>HEIGHT-9)continue;
+            float angle=(float)((seed>>4)&1023u)/1024.0f*2.0f*PI,dx=std::cos(angle),dz=std::sin(angle);bool deep=(seed&0x100000u)!=0;int length=deep?27:10;
+            for(int t=0;t<=length;t++){float cx=ex+dx*t*.62f,cz=ez+dz*t*.62f,cy=surface-1.0f-t*(deep?.52f:.38f),radius=t<3?2.45f:(deep?2.0f:1.45f);
+                for(int vz=(int)cz-3;vz<=(int)cz+3;vz++)for(int vx=(int)cx-3;vx<=(int)cx+3;vx++)for(int vy=(int)cy-2;vy<=(int)cy+2;vy++){float nx=(vx+.5f-cx)/radius,nz=(vz+.5f-cz)/radius,ny=(vy+.5f-cy)/(radius*.78f);if(nx*nx+ny*ny+nz*nz<1.0f)put(vx,vy,vz,0);}}
+            if(deep){float cx=ex+dx*length*.62f,cz=ez+dz*length*.62f,cy=surface-1.0f-length*.52f;for(int vz=(int)cz-5;vz<=(int)cz+5;vz++)for(int vx=(int)cx-5;vx<=(int)cx+5;vx++)for(int vy=(int)cy-4;vy<=(int)cy+4;vy++){float nx=(vx+.5f-cx)/4.2f,nz=(vz+.5f-cz)/4.2f,ny=(vy+.5f-cy)/3.3f;if(nx*nx+ny*ny+nz*nz<1.0f)put(vx,vy,vz,0);}}
+        }
         // Four deterministic silhouettes: oak, pine, broad crown and slim birch-like tree.
         for(int z=oz-5;z<oz+CS+5;z++)for(int x=ox-5;x<ox+CS+5;x++){
             if(modp(x+3,8)||modp(z+5,8))continue;

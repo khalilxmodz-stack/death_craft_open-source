@@ -88,7 +88,7 @@ struct LanPacket { uint32_t magic=0x44434654u; uint8_t type=0; uint32_t player=0
 
 class Game {
     EGLDisplay display=EGL_NO_DISPLAY; EGLSurface surface=EGL_NO_SURFACE; EGLContext context=EGL_NO_CONTEXT;
-    GLuint program=0,vao=0,vbo=0,atlasTexture=0,khalilTexture=0; GLint mvpLoc=-1,cameraLoc=-1,fogLoc=-1,textureLoc=-1,atlasLoc=-1,skyColorLoc=-1,animTimeLoc=-1,waterAnimationLoc=-1,fogStartLoc=-1,fogEndLoc=-1;
+    GLuint program=0,vao=0,vbo=0,atlasTexture=0,khalilTexture=0; GLint mvpLoc=-1,cameraLoc=-1,fogLoc=-1,textureLoc=-1,atlasLoc=-1,skyColorLoc=-1,animTimeLoc=-1,waterAnimationLoc=-1,fogStartLoc=-1,fogEndLoc=-1,worldLightLoc=-1;
     V3 skyTint{.48f,.74f,.96f};
     float dayClock=0.0f,animationTime=0.0f;
     struct DroppedItem{uint8_t id=0;int count=1;float x=0,y=0,z=0,vx=0,vy=0,vz=0,age=0;};
@@ -126,7 +126,8 @@ class Game {
     float grafikHitTimer=0.0f,swordCooldown=0.0f;
     bool smoothGraphics=true,settingsOpen=false;
     int drawDistance=7;
-    bool creativeMode=true,flatWorld=false,inWorld=false;
+    bool creativeMode=true,spectatorMode=false,flatWorld=false,inWorld=false;
+    float worldBrightness=1.0f,skeletonNetTimer=0;
     int selectedSlot=0;
     std::string saveDirectory;
     float saveTimer=0;
@@ -143,6 +144,7 @@ class Game {
     float lanTimer=0,helloTimer=0,remoteTimer=0;
     bool remoteValid=false;
     float remoteX=0,remoteY=0,remoteZ=0,remoteYaw=0;
+    bool remoteCreative=false,remoteSpectator=false;
     sockaddr_in lanBroadcast{};
 
 #include "systems/lan.inc"
@@ -172,10 +174,11 @@ public:
             if(settingsOpen){if(x>.62f&&y>.55f){settingsOpen=false;return 1;}if(y>.05f&&y<.30f){smoothGraphics=!smoothGraphics;applyGraphicsFiltering();return 1;}if(y>-.35f&&y<-.02f){drawDistance=std::clamp(drawDistance+(x<-.12f?-1:1),3,10);return 1;}return 1;}if(inventoryOpen){if(x>.62f&&y>.55f){inventoryOpen=false;craftingTableOpen=false;dragIndex=-1;return 1;}if(x>.55f&&x<.80f&&y>.20f&&y<.43f){craft(craftingTableOpen?3:0);return 1;}if(x>.55f&&x<.80f&&y>-.08f&&y<.16f){craft(craftingTableOpen?4:1);return 1;}if(x>.55f&&x<.80f&&y>-.38f&&y<-.12f){craft(craftingTableOpen?5:2);return 1;}int slot=inventorySlotAt(x,y);if(slot>=0){dragIndex=slot;dragPointer=id;dragX=x;dragY=y;}return 1;}
             if(x>-.95f&&x<-.72f&&y<-.90f){setLanMode(2);return 1;}
             if(x>-.70f&&x<-.47f&&y<-.90f){setLanMode(1);return 1;}
-            if(x>.81f&&y>.72f){inventoryOpen=true;joyId=lookId=-1;joyX=joyY=0;breaking=false;return 1;}
+            if(x>.81f&&y>.72f){inventoryOpen=true;craftingTableOpen=false;joyId=lookId=-1;joyX=joyY=0;breaking=false;return 1;}
+            if(x>.80f&&y>.27f&&y<.48f){cycleGameMode();return 1;}
             if(x>.82f&&y>.48f&&y<.68f){settingsOpen=true;joyId=lookId=-1;joyX=joyY=0;return 1;}
             if(x<-.42f&&y<0&&y>-.88f){joyId=id;joyOriginX=x;joyOriginY=y;setJoy(x,y);}
-            else if(x>.65f&&y<-.43f){if(inWater()){vy=3.4f;grounded=false;fallTracking=false;}else if(grounded){vy=7.4f;grounded=false;fallStartFeet=feet;fallPeakFeet=feet;fallTracking=true;}}
+            else if(x>.65f&&y<-.43f){if(spectatorMode){feet+=2.0f;return 1;}if(inWater()){vy=3.4f;grounded=false;fallTracking=false;}else if(grounded){vy=7.4f;grounded=false;fallStartFeet=feet;fallPeakFeet=feet;fallTracking=true;}}
             else if(x>.65f&&y>-.34f&&y<.12f){int tx,ty,tz,ax,ay,az;if(raycast(tx,ty,tz,ax,ay,az)){breaking=true;breakPointer=id;breakX=tx;breakY=ty;breakZ=tz;breakTimer=0;}}
             else if(x>.40f&&x<.66f&&y>-.54f&&y<-.25f)editBlock(true);
             else if(x>.38f&&x<.64f&&y>-.22f&&y<.03f)useTarget();

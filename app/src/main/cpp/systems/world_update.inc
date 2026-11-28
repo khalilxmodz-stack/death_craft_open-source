@@ -9,7 +9,7 @@
     void updateSky(){
         float phase=dayClock/1200.0f;
         float daylight=std::clamp(std::sin(phase*2.0f*PI)*2.4f+.15f,0.0f,1.0f);
-        V3 night{.0015f,.002f,.006f},day{.48f,.74f,.96f},dawn{.92f,.34f,.16f};
+        V3 night{.0015f,.002f,.006f},day{.48f,.74f,.96f},dawn{.92f,.34f,.16f};worldBrightness=.20f+.80f*daylight;
         skyTint={night.x+(day.x-night.x)*daylight,night.y+(day.y-night.y)*daylight,night.z+(day.z-night.z)*daylight};
         float sunHeight=std::sin(phase*2.0f*PI);
         float dusk=std::clamp(1.0f-std::abs(sunHeight)*3.2f,0.0f,1.0f)*(1.0f-daylight);

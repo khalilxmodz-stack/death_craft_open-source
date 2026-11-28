@@ -23,7 +23,7 @@
         while(recvfrom(lanSocket,&p,sizeof(p),0,(sockaddr*)&from,&fromLen)==sizeof(p)){
             if(p.magic!=0x44434654u||p.player==networkId)continue;
             if(p.type==1&&lanMode==1){LanPacket reply{};reply.type=2;reply.player=networkId;reply.x=px;reply.y=feet;reply.z=pz;reply.yaw=yaw;std::strncpy(reply.name,playerName.c_str(),sizeof(reply.name)-1);sendLan(reply);}
-            else if(p.type==2){remoteValid=true;remoteTimer=0;remoteX=p.x;remoteY=p.y;remoteZ=p.z;remoteYaw=p.yaw;remoteName=p.name[0]?p.name:"PLAYER";}
+            else if(p.type==2){remoteValid=true;remoteTimer=0;remoteX=p.x;remoteY=p.y;remoteZ=p.z;remoteYaw=p.yaw;remoteCreative=(p.flags&1)!=0;remoteSpectator=(p.flags&2)!=0;remoteName=p.name[0]?p.name:"PLAYER";}
             else if(p.type==3){int cx=floorDiv(p.bx,CS),cz=floorDiv(p.bz,CS);Chunk&c=ensureChunk(cx,cz);c.set(modp(p.bx,CS),p.by,modp(p.bz,CS),p.block);edits[{p.bx,p.by,p.bz}]=p.block;waterFlowDepth.erase({p.bx,p.by,p.bz});for(auto&entry:chunks)entry.second.dirty=true;}
             else if(p.type==4&&lanMode==2){khalilX=p.x;khalilFeet=p.y;khalilZ=p.z;khalilAlive=(p.flags&1)!=0;khalilPrimed=(p.flags&2)!=0;khalilHitTimer=(p.flags&4)?.24f:0;khalilHealth=p.block;}
             else if(p.type==6&&lanMode==1){
@@ -37,6 +37,8 @@
             }
             else if(p.type==7&&lanMode==2){if(p.flags&1){grafikHealth=p.block;grafikAlive=grafikHealth>0;grafikHitTimer=.28f;}else{khalilHealth=p.block;khalilAlive=khalilHealth>0;khalilHitTimer=.28f;}}
             else if(p.type==10&&lanMode==2){grafikX=p.x;grafikFeet=p.y;grafikZ=p.z;grafikAlive=(p.flags&1)!=0;grafikHitTimer=(p.flags&2)?.24f:0;grafikHealth=p.block;}
+            else if(p.type==11&&lanMode==2){skeletonX=p.x;skeletonFeet=p.y;skeletonZ=p.z;skeletonYaw=p.yaw;skeletonAlive=(p.flags&1)!=0;skeletonHealth=p.block;}
+            else if(p.type==12&&lanMode==2){ArrowProjectile a{};a.x=p.x;a.y=p.y;a.z=p.z;a.vx=p.yaw;a.vy=p.flags/10.0f;a.vz=p.block/10.0f;a.life=2.4f;skeletonArrows.push_back(a);}
             else if(p.type==8){DroppedItem item{};item.id=p.block;item.count=std::max(1,(int)p.flags);item.x=p.x;item.y=p.y;item.z=p.z;droppedItems.push_back(item);}
             else if(p.type==9){for(auto it=droppedItems.begin();it!=droppedItems.end();){float dx=it->x-p.x,dy=it->y-p.y,dz=it->z-p.z;if(dx*dx+dy*dy+dz*dz<.36f&&it->id==p.block){it=droppedItems.erase(it);break;}++it;}}
             else if(p.type==5&&lanMode==2){
@@ -47,9 +49,9 @@
             fromLen=sizeof(from);
         }
         lanTimer+=dt;helloTimer+=dt;remoteTimer+=dt;
-        if(lanTimer>=.10f){lanTimer=0;LanPacket state{};state.type=2;state.player=networkId;state.x=px;state.y=feet;state.z=pz;state.yaw=yaw;std::strncpy(state.name,playerName.c_str(),sizeof(state.name)-1);sendLan(state);}
+        if(lanTimer>=.10f){lanTimer=0;LanPacket state{};state.type=2;state.player=networkId;state.x=px;state.y=feet;state.z=pz;state.yaw=yaw;state.flags=(creativeMode?1:0)|(spectatorMode?2:0);std::strncpy(state.name,playerName.c_str(),sizeof(state.name)-1);sendLan(state);}
         if(lanMode==2&&helloTimer>=.50f){helloTimer=0;LanPacket hello{};hello.type=1;hello.player=networkId;sendLan(hello);}
-        if(lanMode==1&&lanTimer==0.0f){LanPacket monster{};monster.type=4;monster.player=networkId;monster.x=khalilX;monster.y=khalilFeet;monster.z=khalilZ;monster.flags=(khalilAlive?1:0)|(khalilPrimed?2:0)|(khalilHitTimer>0?4:0);monster.block=(uint8_t)std::clamp(khalilHealth,0,255);sendLan(monster);LanPacket grafik{};grafik.type=10;grafik.player=networkId;grafik.x=grafikX;grafik.y=grafikFeet;grafik.z=grafikZ;grafik.flags=(grafikAlive?1:0)|(grafikHitTimer>0?2:0);grafik.block=(uint8_t)std::clamp(grafikHealth,0,255);sendLan(grafik);}
+        if(lanMode==1&&lanTimer==0.0f){skeletonNetTimer+=.10f;if(skeletonNetTimer>=.20f){skeletonNetTimer=0;LanPacket sk{};sk.type=11;sk.player=networkId;sk.x=skeletonX;sk.y=skeletonFeet;sk.z=skeletonZ;sk.yaw=skeletonYaw;sk.flags=skeletonAlive?1:0;sk.block=(uint8_t)std::clamp(skeletonHealth,0,255);sendLan(sk);}LanPacket monster{};monster.type=4;monster.player=networkId;monster.x=khalilX;monster.y=khalilFeet;monster.z=khalilZ;monster.flags=(khalilAlive?1:0)|(khalilPrimed?2:0)|(khalilHitTimer>0?4:0);monster.block=(uint8_t)std::clamp(khalilHealth,0,255);sendLan(monster);LanPacket grafik{};grafik.type=10;grafik.player=networkId;grafik.x=grafikX;grafik.y=grafikFeet;grafik.z=grafikZ;grafik.flags=(grafikAlive?1:0)|(grafikHitTimer>0?2:0);grafik.block=(uint8_t)std::clamp(grafikHealth,0,255);sendLan(grafik);}
         if(remoteTimer>3.0f)remoteValid=false;
     }
 
