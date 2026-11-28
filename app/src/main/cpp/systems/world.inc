@@ -38,8 +38,8 @@
             feet=(float)groundHeight((int)px,(int)pz);
             inventory[0]=creativeMode?Item{1,999999}:Item{1,32};inventory[1]=creativeMode?Item{2,999999}:Item{2,16};
             inventory[2]=creativeMode?Item{3,999999}:Item{3,12};inventory[3]=creativeMode?Item{4,999999}:Item{4,4};
-            inventory[4]=creativeMode?Item{5,999999}:Item{5,8};inventory[5]=creativeMode?Item{6,999999}:Item{6,8};
-            inventory[6]=creativeMode?Item{7,999999}:Item{7,0};inventory[7]=creativeMode?Item{8,999999}:Item{8,0};
+            inventory[4]=creativeMode?Item{10,999999}:Item{10,4};inventory[5]=creativeMode?Item{6,999999}:Item{6,8};
+            inventory[6]=creativeMode?Item{7,999999}:Item{7,0};inventory[7]=creativeMode?Item{8,999999}:Item{8,0};inventory[8]=creativeMode?Item{5,999999}:Item{5,8};
         }
         if(creativeMode)for(auto&i:inventory)if(i.id)i.count=999999;
         grafikX=6;grafikZ=-5;grafikFeet=(float)groundHeight(6,-5);khalilX=px+9.0f;khalilZ=pz+4.0f;khalilFeet=(float)groundHeight((int)khalilX,(int)khalilZ);khalilAlive=true;khalilPrimed=false;khalilFuse=0;khalilRespawn=0;explosionEffectTimer=0;deathMessage="GRAFIK ATE YOU";selected=0;inWorld=true;saveTimer=0;updateWorld();status=loaded?"WORLD LOADED":"WORLD CREATED";statusFrames=120;
@@ -49,8 +49,8 @@
         return it==chunks.end()?0:it->second.get(modp(x,CS),y,modp(z,CS));
     }
     void addBlockFace(std::vector<float>&v,V3 a,V3 b,V3 c,V3 d,uint8_t block,int face,int gx,int gy,int gz){
-        int tile=block==9?4:(block==3?2:(block==5?3:((block==1&&face==2)?0:1)));
-        float u0=(tile+.012f)/5.0f,u1=(tile+.988f)/5.0f,v0=.012f,v1=.988f;
+        int tile=block==10?5:(block==9?4:(block==3?2:(block==5?3:((block==1&&face==2)?0:1))));
+        float u0=(tile+.012f)/6.0f,u1=(tile+.988f)/6.0f,v0=.012f,v1=.988f;
         const float shade[6]={.72f,.84f,1.0f,.38f,.62f,.78f};float light=shade[face];
         if(block==1&&face==2){
             bool underTree=false;
@@ -103,6 +103,6 @@
     V3 blockColor(uint8_t b,int face){
         if(b==9)return{.12f,.42f,.82f};if(b==1){if(face==2)return{.22f,.68f,.18f};return{.42f,.29f,.16f};}
         if(b==2)return{.48f,.31f,.17f};if(b==3)return{.43f,.45f,.48f};
-        if(b==4)return{.43f,.27f,.12f};if(b==5)return{.12f,.48f,.13f};if(b==6)return{.67f,.46f,.24f};return{.72f,.62f,.35f};
+        if(b==4)return{.43f,.27f,.12f};if(b==5)return{.12f,.48f,.13f};if(b==6)return{.67f,.46f,.24f};if(b==10)return{1,1,1};return{.72f,.62f,.35f};
     }
-    float breakDuration(uint8_t b)const{switch(b){case 1:return .65f;case 2:return .90f;case 3:return 2.10f;case 4:return 1.25f;case 5:return .30f;case 6:return 1.10f;default:return .85f;}}
+    float breakDuration(uint8_t b)const{switch(b){case 1:return .65f;case 2:return .90f;case 3:return 2.10f;case 4:return 1.25f;case 5:return .30f;case 6:return 1.10f;case 10:return .25f;default:return .85f;}}
