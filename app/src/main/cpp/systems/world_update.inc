@@ -263,6 +263,15 @@
     void drawHeldItem(const Mat4&vp){
         if(selected<0||selected>=(int)inventory.size()||inventory[selected].count<=0)return;
         uint8_t id=inventory[selected].id;if(id==11||id==12||id==15||id==16)return;
+        if(id==20){
+            V3 right{std::cos(yaw),0,std::sin(yaw)},up{-std::sin(yaw)*std::sin(pitch),std::cos(pitch),std::cos(yaw)*std::sin(pitch)},forward{std::sin(yaw)*std::cos(pitch),std::sin(pitch),-std::cos(yaw)*std::cos(pitch)};
+            V3 origin{px+forward.x*.66f+right.x*.34f-up.x*.34f,feet+1.62f+forward.y*.66f+right.y*.34f-up.y*.34f,pz+forward.z*.66f+right.z*.34f-up.z*.34f};
+            auto pt=[&](float x,float y,float z){return V3{origin.x+right.x*x+up.x*y+forward.x*z,origin.y+right.y*x+up.y*y+forward.y*z,origin.z+right.z*x+up.z*y+forward.z*z};};
+            std::vector<float> door;auto q=[&](float x0,float y0,float x1,float y1,V3 color){addFace(door,pt(x0,y0,0),pt(x1,y0,0),pt(x1,y1,0),pt(x0,y1,0),color);};
+            q(-.20f,-.34f,.20f,.35f,{.68f,.39f,.16f});q(-.17f,-.31f,.17f,.32f,{.82f,.55f,.28f});
+            for(int row=0;row<2;row++)for(int col=0;col<2;col++){float x=-.105f+col*.12f,y=.02f+row*.13f;q(x,y,x+.065f,y+.065f,{.19f,.10f,.045f});}
+            glDisable(GL_DEPTH_TEST);draw(door,GL_TRIANGLES,vp,px,feet+1.62f,pz,false,false);glEnable(GL_DEPTH_TEST);return;
+        }
         V3 right{std::cos(yaw),0,std::sin(yaw)},up{-std::sin(yaw)*std::sin(pitch),std::cos(pitch),std::cos(yaw)*std::sin(pitch)},forward{std::sin(yaw)*std::cos(pitch),std::sin(pitch),-std::cos(yaw)*std::cos(pitch)};
         V3 origin{px+forward.x*.66f+right.x*.34f-up.x*.34f,feet+1.62f+forward.y*.66f+right.y*.34f-up.y*.34f,pz+forward.z*.66f+right.z*.34f-up.z*.34f};
         auto pt=[&](float x,float y,float z){return V3{origin.x+right.x*x+up.x*y+forward.x*z,origin.y+right.y*x+up.y*y+forward.y*z,origin.z+right.z*x+up.z*y+forward.z*z};};
