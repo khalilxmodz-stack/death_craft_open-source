@@ -97,7 +97,7 @@ class Game {
     SLObjectItf slEngineObject=nullptr,slOutputMix=nullptr;
     SLEngineItf slEngine=nullptr;
     SLObjectItf slPlayers[3]{}; SLPlayItf slPlay[3]{}; SLSeekItf slSeek[3]{}; AAsset* soundAssets[3]{}; int soundFds[3]{-1,-1,-1};
-    float footstepTimer=0.0f; GLint mvpLoc=-1,cameraLoc=-1,fogLoc=-1,textureLoc=-1,atlasLoc=-1,skyColorLoc=-1,animTimeLoc=-1,waterAnimationLoc=-1,fogStartLoc=-1,fogEndLoc=-1,worldLightLoc=-1;
+    float footstepTimer=0.0f; bool footstepActive=false; GLint mvpLoc=-1,cameraLoc=-1,fogLoc=-1,textureLoc=-1,atlasLoc=-1,skyColorLoc=-1,animTimeLoc=-1,waterAnimationLoc=-1,fogStartLoc=-1,fogEndLoc=-1,worldLightLoc=-1;
     V3 skyTint{.48f,.74f,.96f};
     float dayClock=0.0f,animationTime=0.0f;
     bool nightActive=false;
@@ -193,10 +193,19 @@ class Game {
             if(!slPlayers[i]){close(fd);soundFds[i]=-1;}
         }
     }
-    void playSound(int id){
+    bool isSoundPlaying(int id){
+        if(id<0||id>=3||!slPlay[id])return false;
+        SLuint32 state=SL_PLAYSTATE_STOPPED;
+        return (*slPlay[id])->GetPlayState(slPlay[id],&state)==SL_RESULT_SUCCESS&&state==SL_PLAYSTATE_PLAYING;
+    }
+    void stopSound(int id){
         if(id<0||id>=3||!slPlay[id])return;
         (*slPlay[id])->SetPlayState(slPlay[id],SL_PLAYSTATE_STOPPED);
         if(slSeek[id])(*slSeek[id])->SetPosition(slSeek[id],0,SL_SEEKMODE_FAST);
+    }
+    void playSound(int id){
+        if(id<0||id>=3||!slPlay[id])return;
+        stopSound(id);
         (*slPlay[id])->SetPlayState(slPlay[id],SL_PLAYSTATE_PLAYING);
     }
     void shutdownAudio(){

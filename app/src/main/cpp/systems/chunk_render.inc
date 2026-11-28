@@ -38,9 +38,11 @@
                 for(int row=0;row<2;row++)for(int col=0;col<2;col++){float hx=x0+.24f+col*.25f,hy=Y+.78f+row*.34f,hz=b==20?z0-.004f:z1+.004f;float hs=.075f; if(b==20)quad(hx,hy,hz,hx+hs,hy,hz,hx+hs,hy+hs,hz,hx,hy+hs,hz,19);else quad(hx,hy,hz,hx,hy,hz-hs,hx,hy+hs,hz-hs,hx,hy+hs,hz,19);}
             }else if(b==18){
                 auto box=[&](float x0,float y0,float z0,float x1,float y1,float z1,uint8_t material){V3 a{x0,y0,z0},bb{x1,y0,z0},cc{x1,y1,z0},dd{x0,y1,z0},e{x0,y0,z1},f{x1,y0,z1},g{x1,y1,z1},h{x0,y1,z1};addBlockFace(c.mesh,a,bb,cc,dd,material,0,ox+x,y,oz+z,blockLight);addBlockFace(c.mesh,f,e,h,g,material,1,ox+x,y,oz+z,blockLight);addBlockFace(c.mesh,dd,cc,g,h,material,2,ox+x,y,oz+z,blockLight);addBlockFace(c.mesh,e,f,bb,a,material,3,ox+x,y,oz+z,blockLight);addBlockFace(c.mesh,e,a,dd,h,material,4,ox+x,y,oz+z,blockLight);addBlockFace(c.mesh,bb,f,g,cc,material,5,ox+x,y,oz+z,blockLight);};
-                box(X+.05f,Y+.08f,Z+.05f,X+.95f,Y+.22f,Z+.95f,4);
-                box(X+.05f,Y+.22f,Z+.05f,X+.95f,Y+.48f,Z+.95f,18);
-                box(X+.08f,Y+.48f,Z+.72f,X+.92f,Y+.60f,Z+.94f,14);
+                // Taller, fuller classic bed: wooden base, thick mattress and raised white pillow.
+                box(X+.035f,Y+.08f,Z+.035f,X+.965f,Y+.22f,Z+.965f,4);
+                box(X+.045f,Y+.22f,Z+.045f,X+.955f,Y+.64f,Z+.955f,18);
+                box(X+.07f,Y+.64f,Z+.70f,X+.93f,Y+.82f,Z+.95f,14);
+                box(X+.045f,Y+.78f,Z+.045f,X+.955f,Y+.84f,Z+.12f,4);
             }else{
                 if(!localSolid(x,y,z-1)&&c.get(x,y,z-1)!=9)addBlockFace(c.mesh,p000,p100,p110,p010,b,0,ox+x,y,oz+z,blockLight);
                 if(!localSolid(x,y,z+1)&&c.get(x,y,z+1)!=9)addBlockFace(c.mesh,p101,p001,p011,p111,b,1,ox+x,y,oz+z,blockLight);

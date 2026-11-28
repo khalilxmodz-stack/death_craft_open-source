@@ -470,7 +470,7 @@
         if(!playerDead){
         float forward=joyY,side=joyX,mag=std::sqrt(forward*forward+side*side);if(mag>1){forward/=mag;side/=mag;}
         bool swimming=inWater();float speed=swimming?2.8f:5.2f;
-        bool walkingInput=mag>.12f;footstepTimer-=dt;if(walkingInput&&grounded&&!swimming&&footstepTimer<=0){playSound(1);footstepTimer=.43f;}if(!spectatorMode)movePlayer((std::sin(yaw)*forward+std::cos(yaw)*side)*speed*dt,(-std::cos(yaw)*forward+std::sin(yaw)*side)*speed*dt);else{px+=(std::sin(yaw)*forward+std::cos(yaw)*side)*8.0f*dt;pz+=(-std::cos(yaw)*forward+std::sin(yaw)*side)*8.0f*dt;}
+        bool walkingInput=mag>.12f;bool walkingNow=walkingInput&&grounded&&!swimming&&!spectatorMode;if(walkingNow){if(!footstepActive){playSound(1);footstepActive=true;footstepTimer=.43f;}else{footstepTimer-=dt;if(footstepTimer<=0){if(!isSoundPlaying(1))playSound(1);footstepTimer=.43f;}}}else{if(footstepActive)stopSound(1);footstepActive=false;footstepTimer=0.0f;}if(!spectatorMode)movePlayer((std::sin(yaw)*forward+std::cos(yaw)*side)*speed*dt,(-std::cos(yaw)*forward+std::sin(yaw)*side)*speed*dt);else{px+=(std::sin(yaw)*forward+std::cos(yaw)*side)*8.0f*dt;pz+=(-std::cos(yaw)*forward+std::sin(yaw)*side)*8.0f*dt;}
         if(spectatorMode){vy=0;grounded=false;fallTracking=false;}else if(swimming){grounded=false;fallTracking=false;vy-=2.0f*dt;if(feet+1.2f<SEA_LEVEL)vy+=5.0f*dt;vy*=.94f;vy=std::clamp(vy,-2.0f,3.0f);feet+=vy*dt;}
         else {if(grounded&&!supported()){grounded=false;fallStartFeet=feet;fallPeakFeet=feet;fallTracking=true;}}
         if(!spectatorMode&&!grounded&&!swimming){fallPeakFeet=std::max(fallPeakFeet,feet);vy-=22*dt;float next=feet+vy*dt;if(vy<=0){int bx=(int)std::floor(px),bz=(int)std::floor(pz),by=(int)std::floor(next-.01f);
@@ -544,18 +544,49 @@
                 addFace(avatar,e,a,dd,hh,c);addFace(avatar,b,ff,g,cc,c);
                 addFace(avatar,dd,cc,g,hh,c);addFace(avatar,e,ff,b,a,c);
             };
-            // Classic blocky player silhouette: blue shirt, indigo trousers, skin and hair.
-            cube(rx-.30f,ry+.78f,rz-.15f,.60f,.78f,.30f,{.08f,.28f,.82f});
-            cube(rx-.30f,ry+.25f,rz-.15f,.24f,.55f,.30f,{.10f,.18f,.62f});
-            cube(rx+.06f,ry+.25f,rz-.15f,.24f,.55f,.30f,{.10f,.18f,.62f});
-            cube(rx-.43f,ry+.78f,rz-.13f,.13f,.70f,.26f,{.72f,.48f,.32f});
-            cube(rx+.30f,ry+.78f,rz-.13f,.13f,.70f,.26f,{.72f,.48f,.32f});
-            cube(rx-.28f,ry+1.58f,rz-.25f,.56f,.55f,.50f,{.72f,.48f,.32f});
-            cube(rx-.285f,ry+1.78f,rz-.258f,.57f,.12f,.515f,{.34f,.20f,.10f});
-            cube(rx-.16f,ry+1.79f,rz-.275f,.08f,.07f,.025f,{.04f,.04f,.04f});
-            cube(rx+.08f,ry+1.79f,rz-.275f,.08f,.07f,.025f,{.04f,.04f,.04f});
-            cube(rx-.045f,ry+1.66f,rz-.278f,.09f,.08f,.025f,{.52f,.31f,.22f});
-            cube(rx-.10f,ry+1.61f,rz-.278f,.20f,.035f,.025f,{.30f,.12f,.10f});
+            // Detailed classic block character with layered clothing and a readable face.
+            const V3 skin{.78f,.56f,.39f},skinLight{.91f,.70f,.51f},skinShade{.58f,.36f,.24f};
+            const V3 shirt{.08f,.34f,.88f},shirtLight{.16f,.48f,1.0f},shirtDark{.035f,.18f,.52f};
+            const V3 pants{.12f,.20f,.62f},pantsLight{.20f,.31f,.78f},boots{.22f,.13f,.075f};
+            // Torso, collar, seams and chest pocket.
+            cube(rx-.30f,ry+.78f,rz-.15f,.60f,.78f,.30f,shirt);
+            cube(rx-.11f,ry+1.48f,rz-.166f,.22f,.10f,.035f,{.88f,.91f,.98f});
+            cube(rx+.13f,ry+1.15f,rz-.166f,.12f,.18f,.025f,shirtLight);
+            cube(rx+.13f,ry+1.15f,rz-.184f,.09f,.12f,.012f,shirtDark);
+            cube(rx-.30f,ry+.80f,rz-.166f,.60f,.045f,.025f,shirtDark);
+            // Legs, knees, trouser seams and boots.
+            cube(rx-.30f,ry+.25f,rz-.15f,.24f,.55f,.30f,pants);
+            cube(rx+.06f,ry+.25f,rz-.15f,.24f,.55f,.30f,pants);
+            cube(rx-.28f,ry+.47f,rz-.166f,.18f,.12f,.025f,pantsLight);
+            cube(rx+.10f,ry+.47f,rz-.166f,.18f,.12f,.025f,pantsLight);
+            cube(rx-.31f,ry+.25f,rz-.19f,.26f,.16f,.38f,boots);
+            cube(rx+.05f,ry+.25f,rz-.19f,.26f,.16f,.38f,boots);
+            cube(rx-.31f,ry+.24f,rz-.195f,.26f,.035f,.39f,{.10f,.075f,.055f});
+            cube(rx+.05f,ry+.24f,rz-.195f,.26f,.035f,.39f,{.10f,.075f,.055f});
+            // Arms with blue sleeves, skin hands and small cuff bands.
+            cube(rx-.43f,ry+.78f,rz-.13f,.13f,.70f,.26f,shirtDark);
+            cube(rx+.30f,ry+.78f,rz-.13f,.13f,.70f,.26f,shirtDark);
+            cube(rx-.43f,ry+1.20f,rz-.145f,.14f,.27f,.285f,shirtLight);
+            cube(rx+.30f,ry+1.20f,rz-.145f,.14f,.27f,.285f,shirtLight);
+            cube(rx-.43f,ry+.78f,rz-.13f,.13f,.22f,.26f,skin);
+            cube(rx+.30f,ry+.78f,rz-.13f,.13f,.22f,.26f,skin);
+            cube(rx-.43f,ry+.99f,rz-.148f,.14f,.045f,.285f,{.91f,.92f,.96f});
+            cube(rx+.30f,ry+.99f,rz-.148f,.14f,.045f,.285f,{.91f,.92f,.96f});
+            // Head, hair cap and side hair.
+            cube(rx-.28f,ry+1.58f,rz-.25f,.56f,.55f,.50f,skin);
+            cube(rx-.285f,ry+1.98f,rz-.258f,.57f,.16f,.515f,{.25f,.14f,.075f});
+            cube(rx-.285f,ry+1.72f,rz-.258f,.07f,.30f,.515f,{.30f,.17f,.09f});
+            cube(rx+.215f,ry+1.72f,rz-.258f,.07f,.30f,.515f,{.30f,.17f,.09f});
+            // Brows, eyes, nose and mouth on the front face.
+            cube(rx-.17f,ry+1.88f,rz-.278f,.12f,.035f,.025f,{.22f,.12f,.065f});
+            cube(rx+.05f,ry+1.88f,rz-.278f,.12f,.035f,.025f,{.22f,.12f,.065f});
+            cube(rx-.16f,ry+1.80f,rz-.282f,.09f,.075f,.028f,{.96f,.96f,.90f});
+            cube(rx+.07f,ry+1.80f,rz-.282f,.09f,.075f,.028f,{.96f,.96f,.90f});
+            cube(rx-.125f,ry+1.81f,rz-.300f,.035f,.055f,.018f,{.12f,.24f,.48f});
+            cube(rx+.105f,ry+1.81f,rz-.300f,.035f,.055f,.018f,{.12f,.24f,.48f});
+            cube(rx-.045f,ry+1.68f,rz-.292f,.09f,.095f,.065f,skinLight);
+            cube(rx-.10f,ry+1.61f,rz-.282f,.20f,.035f,.025f,{.34f,.13f,.10f});
+            cube(rx-.07f,ry+1.58f,rz-.282f,.14f,.025f,.025f,{.48f,.19f,.14f});
             draw(avatar,GL_TRIANGLES,vp,px,feet+1.62f,pz,true,false);
             float labelY=ry+2.28f;
             float cx=vp.m[0]*rx+vp.m[4]*labelY+vp.m[8]*rz+vp.m[12];
