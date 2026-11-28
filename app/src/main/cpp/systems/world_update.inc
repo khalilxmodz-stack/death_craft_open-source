@@ -1,3 +1,6 @@
+// Subsystem: Per-frame world simulation, entities, environmental effects, and world rendering.
+// Function comments describe each method's responsibility and its place in the game systems.
+
     void updateWorld(){
         int cx=floorDiv((int)std::floor(px),CS),cz=floorDiv((int)std::floor(pz),CS);
         // Stream a few nearby chunks per frame; keep generation out of a single long frame.
