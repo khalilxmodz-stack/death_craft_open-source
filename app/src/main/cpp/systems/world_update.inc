@@ -331,6 +331,7 @@
     void updateKhalil(float dt){
         khalilHitTimer=std::max(0.0f,khalilHitTimer-dt);
         if(explosionEffectTimer>0)explosionEffectTimer=std::max(0.0f,explosionEffectTimer-dt);
+        if(!isNight()){khalilAlive=false;khalilPrimed=false;khalilFuse=0;return;}
         if(lanMode==2)return;
         if(!khalilAlive){
             khalilRespawn+=dt;
@@ -412,6 +413,7 @@
     }
     void updateSkeleton(float dt){
         skeletonHitTimer=std::max(0.0f,skeletonHitTimer-dt);
+        if(!isNight()){skeletonAlive=false;skeletonArrows.clear();return;}
         if(!skeletonAlive){skeletonRespawn+=dt;if(skeletonRespawn>22.0f){skeletonAlive=true;skeletonHealth=8;skeletonX=px+8.0f;skeletonZ=pz+5.0f;skeletonFeet=mobSurfaceHeight(skeletonX,skeletonZ,feet);if(skeletonFeet<0.0f)skeletonFeet=(float)groundHeight((int)skeletonX,(int)skeletonZ);skeletonShootTimer=1.2f;}return;}
         float dx=px-skeletonX,dz=pz-skeletonZ,dist=std::sqrt(dx*dx+dz*dz);if(dist<.001f)return;skeletonYaw=std::atan2(dx,-dz);
         float currentSurface=mobSurfaceHeight(skeletonX,skeletonZ,skeletonFeet);

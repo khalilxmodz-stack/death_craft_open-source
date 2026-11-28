@@ -62,9 +62,9 @@
         status=place?"Block placed":"Block broken";statusFrames=60;
     }
     void useTarget(){
+        if(raycast(x,y,z,ax,ay,az)&&blockAt(x,y,z)==18){if(!isNight()){status="YOU CAN ONLY SLEEP AT NIGHT";statusFrames=100;return;}if(lanMode==2){status="ONLY HOST CAN SLEEP";statusFrames=100;return;}dayClock=300.0f;nightActive=false;grafikAlive=false;khalilAlive=false;skeletonAlive=false;skeletonArrows.clear();khalilPrimed=false;khalilFuse=0;updateSky();saveWorld();status="GOOD MORNING";statusFrames=120;return;}
         if(inventory[selected].count>0&&inventory[selected].id==11){attackMonster();return;}if(inventory[selected].count>0&&(inventory[selected].id==12||inventory[selected].id==15||inventory[selected].id==16)){status="TOOL EQUIPPED";statusFrames=45;return;}
         int x,y,z,ax,ay,az;
-        if(raycast(x,y,z,ax,ay,az)&&blockAt(x,y,z)==18){if(!isNight()){status="YOU CAN ONLY SLEEP AT NIGHT";statusFrames=100;return;}if(lanMode==2){status="ONLY HOST CAN SLEEP";statusFrames=100;return;}dayClock=300.0f;nightActive=false;grafikAlive=false;khalilAlive=false;skeletonAlive=false;skeletonArrows.clear();khalilPrimed=false;khalilFuse=0;updateSky();saveWorld();status="GOOD MORNING";statusFrames=120;return;}
         if(raycast(x,y,z,ax,ay,az)&&blockAt(x,y,z)==8){inventoryOpen=true;craftingTableOpen=true;dragIndex=-1;status="CRAFTING TABLE OPEN";statusFrames=70;return;}
         if(raycast(x,y,z,ax,ay,az)&&blockAt(x,y,z)==10){
             auto it=chunks.find(chunkKey(floorDiv(x,CS),floorDiv(z,CS)));
@@ -108,6 +108,7 @@
     }
     void updateGrafik(float dt){
         grafikHitTimer=std::max(0.0f,grafikHitTimer-dt);
+        if(!isNight()){grafikAlive=false;return;}
         if(lanMode==2)return;
         if(!grafikAlive){grafikRespawn+=dt;if(grafikRespawn>18.0f){grafikAlive=true;grafikHealth=6;grafikHitTimer=0;grafikX=px+6.0f;grafikZ=pz-5.0f;grafikFeet=mobSurfaceHeight(grafikX,grafikZ,feet);if(grafikFeet<0.0f)grafikFeet=(float)groundHeight((int)std::floor(grafikX),(int)std::floor(grafikZ));}return;}
         if(playerDead||creativeMode)return;
