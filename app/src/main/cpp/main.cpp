@@ -81,7 +81,7 @@ struct Chunk {
     void set(int x,int y,int z,uint8_t b){if(x>=0&&x<CS&&z>=0&&z<CS&&y>=0&&y<HEIGHT){blocks[(y*CS+z)*CS+x]=b;dirty=true;}}
 };
 
-struct LanPacket { uint32_t magic=0x44434654u; uint8_t type=0; uint32_t player=0; float x=0,y=0,z=0,yaw=0; int32_t bx=0,by=0,bz=0; uint8_t block=0; };
+struct LanPacket { uint32_t magic=0x44434654u; uint8_t type=0; uint32_t player=0; float x=0,y=0,z=0,yaw=0; int32_t bx=0,by=0,bz=0; uint8_t block=0; char name[24]{}; };
 
 class Game {
     EGLDisplay display=EGL_NO_DISPLAY; EGLSurface surface=EGL_NO_SURFACE; EGLContext context=EGL_NO_CONTEXT;
@@ -105,6 +105,9 @@ class Game {
     bool grafikAlive=true,playerDead=false;
     struct Item{uint8_t id=0;int count=0;};std::array<Item,20> inventory{};
     std::string status="DEATH_CRAFT  |  V0.1";
+    std::string playerName="PLAYER",remoteName="PLAYER";
+    bool nameEditing=false;
+    float fpsAccumulator=0,fpsValue=0; int fpsFrames=0;
     int statusFrames=0;
     int lanSocket=-1,lanMode=0;
     uint32_t networkId=0;
@@ -137,13 +140,13 @@ class Game {
         LanPacket p{};sockaddr_in from{};socklen_t fromLen=sizeof(from);
         while(recvfrom(lanSocket,&p,sizeof(p),0,(sockaddr*)&from,&fromLen)==sizeof(p)){
             if(p.magic!=0x44434654u||p.player==networkId)continue;
-            if(p.type==1&&lanMode==1){LanPacket reply{};reply.type=2;reply.player=networkId;reply.x=px;reply.y=feet;reply.z=pz;reply.yaw=yaw;sendLan(reply);}
-            else if(p.type==2){remoteValid=true;remoteTimer=0;remoteX=p.x;remoteY=p.y;remoteZ=p.z;remoteYaw=p.yaw;}
+            if(p.type==1&&lanMode==1){LanPacket reply{};reply.type=2;reply.player=networkId;reply.x=px;reply.y=feet;reply.z=pz;reply.yaw=yaw;std::strncpy(reply.name,playerName.c_str(),sizeof(reply.name)-1);sendLan(reply);}
+            else if(p.type==2){remoteValid=true;remoteTimer=0;remoteX=p.x;remoteY=p.y;remoteZ=p.z;remoteYaw=p.yaw;remoteName=p.name[0]?p.name:"PLAYER";}
             else if(p.type==3){int cx=floorDiv(p.bx,CS),cz=floorDiv(p.bz,CS);Chunk&c=ensureChunk(cx,cz);c.set(modp(p.bx,CS),p.by,modp(p.bz,CS),p.block);edits[{p.bx,p.by,p.bz}]=p.block;for(auto&entry:chunks)entry.second.dirty=true;}
             fromLen=sizeof(from);
         }
         lanTimer+=dt;helloTimer+=dt;remoteTimer+=dt;
-        if(lanTimer>=.10f){lanTimer=0;LanPacket state{};state.type=2;state.player=networkId;state.x=px;state.y=feet;state.z=pz;state.yaw=yaw;sendLan(state);}
+        if(lanTimer>=.10f){lanTimer=0;LanPacket state{};state.type=2;state.player=networkId;state.x=px;state.y=feet;state.z=pz;state.yaw=yaw;std::strncpy(state.name,playerName.c_str(),sizeof(state.name)-1);sendLan(state);}
         if(lanMode==2&&helloTimer>=.50f){helloTimer=0;LanPacket hello{};hello.type=1;hello.player=networkId;sendLan(hello);}
         if(remoteTimer>3.0f)remoteValid=false;
     }
@@ -173,11 +176,11 @@ class Game {
     }
     bool loadTextures(AAssetManager* manager){
         if(!manager)return false;
-        constexpr int tile=256, atlasW=tile*4;
+        constexpr int tile=256, atlasW=tile*5;
         std::vector<unsigned char> atlas((size_t)atlasW*tile*4,255);
-        const char* names[]={"textures/grass_texture.png","textures/dirt_texture.png","textures/stone_texture.png","textures/grass_tree_texture.png"};
-        const unsigned char fallback[4][4]={{78,156,55,255},{126,79,43,255},{116,122,130,255},{49,126,48,255}};
-        for(int layer=0;layer<4;layer++)for(int y=0;y<tile;y++)for(int x=0;x<tile;x++){
+        const char* names[]={"textures/grass_texture.png","textures/dirt_texture.png","textures/stone_texture.png","textures/grass_tree_texture.png","textures/water_texture.png"};
+        const unsigned char fallback[5][4]={{78,156,55,255},{126,79,43,255},{116,122,130,255},{49,126,48,255},{28,112,190,210}};
+        for(int layer=0;layer<5;layer++)for(int y=0;y<tile;y++)for(int x=0;x<tile;x++){
             size_t dst=((size_t)y*atlasW+(size_t)layer*tile+x)*4;
             std::copy(fallback[layer],fallback[layer]+4,atlas.begin()+dst);
         }
@@ -252,7 +255,7 @@ class Game {
         return it==chunks.end()?0:it->second.get(modp(x,CS),y,modp(z,CS));
     }
     void addBlockFace(std::vector<float>&v,V3 a,V3 b,V3 c,V3 d,uint8_t block,int face,int gx,int gy,int gz){
-        int tile=block==3?2:(block==5?3:((block==1&&face==2)?0:1));
+        int tile=block==9?4:(block==3?2:(block==5?3:((block==1&&face==2)?0:1)));
         float u0=(tile+.012f)/4.0f,u1=(tile+.988f)/4.0f,v0=.012f,v1=.988f;
         const float shade[6]={.72f,.84f,1.0f,.38f,.62f,.78f};float light=shade[face];
         if(block==1&&face==2){
@@ -353,6 +356,7 @@ class Game {
         rect(-.94f,.57f,.20f,.12f,lanMode==1?V3{.12f,.55f,.20f}:V3{.04f,.04f,.05f});
         rect(-.70f,.57f,.20f,.12f,lanMode==2?V3{.12f,.35f,.65f}:V3{.04f,.04f,.05f});
         drawText("HOST",-.91f,.61f,.012f,{1,1,1});drawText("JOIN",-.67f,.61f,.012f,{1,1,1});
+        drawText("FPS:"+std::to_string((int)fpsValue),.63f,.68f,.018f,{1,1,1});
         circ(joyOriginX,joyOriginY,.255f,{.01f,.01f,.015f});circ(joyOriginX,joyOriginY,.22f,{.14f,.14f,.16f});circ(joyOriginX+joyX*.16f,joyOriginY+joyY*.16f,.105f,{.01f,.01f,.015f});
         circ(.78f,-.62f,.14f,{.01f,.01f,.015f});circ(.78f,-.62f,.115f,{.17f,.17f,.19f});
         circ(.78f,-.10f,.14f,{.01f,.01f,.015f});circ(.78f,-.10f,.115f,{.17f,.17f,.19f});
@@ -518,6 +522,7 @@ class Game {
         for(auto&entry:chunks)if(entry.second.dirty)rebuild(entry.second);
     }
     void frame(float dt){
+        fpsAccumulator+=dt;fpsFrames++;if(fpsAccumulator>=0.5f){fpsValue=fpsFrames/fpsAccumulator;fpsFrames=0;fpsAccumulator=0;}
         if(!running||!eglMakeCurrent(display,surface,surface,context))return;dt=std::min(dt,.04f);
         if(!inWorld){glViewport(0,0,width,height);glClearColor(.10f,.18f,.25f,1);glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);drawMenu();eglSwapBuffers(display,surface);return;}
         if(playerDead){swallowTimer+=dt;if(swallowTimer>2.8f){playerDead=false;swallowTimer=0;health=10;armor=10;px=0;pz=0;feet=(float)groundHeight(0,0);vy=0;grounded=true;grafikX=6;grafikZ=-5;grafikFeet=(float)groundHeight(6,-5);grafikAlive=true;grafikHealth=2;} }
@@ -544,10 +549,34 @@ class Game {
         glViewport(0,0,width,height);glClearColor(.48f,.74f,.96f,1);glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
         Mat4 vp=mul(perspective(1.02f,(float)width/height,.1f,180),camera(px,feet+1.62f,pz,yaw,pitch));
         for(auto&entry:chunks)draw(entry.second.mesh,GL_TRIANGLES,vp,px,feet+1.62f,pz,true,true);
+        std::vector<float> clouds;
+        auto cloudCube=[&](float x,float y,float z,float w,float h,float d){V3 a{x,y,z},b{x+w,y,z},c{x+w,y+h,z},dd{x,y+h,z},e{x,y,z+d},ff{x+w,y,z+d},g{x+w,y+h,z+d},hh{x,y+h,z+d};V3 col{.94f,.97f,1.0f};addFace(clouds,a,b,c,dd,col);addFace(clouds,ff,e,hh,g,col);addFace(clouds,e,a,dd,hh,col);addFace(clouds,b,ff,g,c,col);addFace(clouds,dd,c,g,hh,col);addFace(clouds,e,ff,b,a,col);};
+        for(int iz=-2;iz<=2;iz++)for(int ix=-2;ix<=2;ix++){float x=std::floor(px/24.0f)*24.0f+ix*24.0f+((ix+iz)&1?5.0f:0.0f),z=std::floor(pz/24.0f)*24.0f+iz*24.0f;float y=19.0f+((ix*3+iz*5)&1)*2.0f;cloudCube(x,y,z,7.0f,1.4f,4.0f);cloudCube(x+3.0f,y+.5f,z-1.0f,5.0f,1.5f,5.0f);cloudCube(x-2.0f,y+.3f,z+1.0f,4.0f,1.2f,3.0f);}
+        draw(clouds,GL_TRIANGLES,vp,px,feet+1.62f,pz,true,false);
         if(remoteValid){
-            std::vector<float> remoteSphere;auto rp=[&](float lat,float lon){return V3{remoteX+.42f*std::cos(lat)*std::sin(lon),remoteY+.72f+.42f*std::sin(lat),remoteZ+.42f*std::cos(lat)*std::cos(lon)};};
-            for(int iy=0;iy<8;iy++){float a0=-PI*.5f+PI*iy/8.0f,a1=-PI*.5f+PI*(iy+1)/8.0f;for(int ix=0;ix<12;ix++){float b0=2*PI*ix/12.0f,b1=2*PI*(ix+1)/12.0f;V3 p0=rp(a0,b0),p1=rp(a0,b1),p2=rp(a1,b1),p3=rp(a1,b0);V3 c{.12f,.48f,.95f};addTri(remoteSphere,p0,p1,p2,c);addTri(remoteSphere,p0,p2,p3,c);}}
-            draw(remoteSphere,GL_TRIANGLES,vp,px,feet+1.62f,pz,true,false);
+            std::vector<float> avatar;
+            auto cube=[&](float x,float y,float z,float w,float h,float d,V3 c){
+                V3 a{x,y,z},b{x+w,y,z},cc{x+w,y+h,z},dd{x,y+h,z};
+                V3 e{x,y,z+d},ff{x+w,y,z+d},g{x+w,y+h,z+d},hh{x,y+h,z+d};
+                addFace(avatar,a,b,cc,dd,c);addFace(avatar,ff,e,hh,g,c);
+                addFace(avatar,e,a,dd,hh,c);addFace(avatar,b,ff,g,cc,c);
+                addFace(avatar,dd,cc,g,hh,c);addFace(avatar,e,ff,b,a,c);
+            };
+            float rx=remoteX,rz=remoteZ,ry=remoteY;
+            cube(rx-.30f,ry+.78f,rz-.15f,.60f,.78f,.30f,{.08f,.28f,.82f});
+            cube(rx-.30f,ry+.25f,rz-.15f,.24f,.55f,.30f,{.10f,.18f,.62f});
+            cube(rx+.06f,ry+.25f,rz-.15f,.24f,.55f,.30f,{.10f,.18f,.62f});
+            cube(rx-.43f,ry+.78f,rz-.13f,.13f,.70f,.26f,{.72f,.48f,.32f});
+            cube(rx+.30f,ry+.78f,rz-.13f,.13f,.70f,.26f,{.72f,.48f,.32f});
+            cube(rx-.28f,ry+1.58f,rz-.25f,.56f,.55f,.50f,{.72f,.48f,.32f});
+            cube(rx-.285f,ry+1.78f,rz-.258f,.57f,.12f,.515f,{.34f,.20f,.10f});
+            cube(rx-.16f,ry+1.79f,rz-.265f,.08f,.07f,.018f,{.04f,.04f,.04f});
+            cube(rx+.08f,ry+1.79f,rz-.265f,.08f,.07f,.018f,{.04f,.04f,.04f});
+            draw(avatar,GL_TRIANGLES,vp,px,feet+1.62f,pz,true,false);
+            float cx=vp.m[0]*rx+vp.m[4]*(ry+2.28f)+vp.m[8]*rz+vp.m[12];
+            float cy=vp.m[1]*rx+vp.m[5]*(ry+2.28f)+vp.m[9]*rz+vp.m[13];
+            float cw=vp.m[3]*rx+vp.m[7]*(ry+2.28f)+vp.m[11]*rz+vp.m[15];
+            if(cw>.05f){float sx=cx/cw,sy=cy/cw;drawText(remoteName,sx-.04f*remoteName.size(),sy+.04f,.014f,{1,1,1});}
         }
         if(grafikAlive){
             std::vector<float> sphere;auto point=[&](float lat,float lon){return V3{grafikX+.58f*std::cos(lat)*std::sin(lon),grafikFeet+.62f+.58f*std::sin(lat),grafikZ+.58f*std::cos(lat)*std::cos(lon)};};
@@ -574,10 +603,13 @@ class Game {
         button(-.62f,.34f,.58f,.20f,creativeMode?V3{.16f,.52f,.25f}:V3{.08f,.10f,.12f});button(.04f,.34f,.58f,.20f,!creativeMode?V3{.16f,.52f,.25f}:V3{.08f,.10f,.12f});
         button(-.62f,.04f,.58f,.20f,flatWorld?V3{.16f,.52f,.25f}:V3{.08f,.10f,.12f});button(.04f,.04f,.58f,.20f,!flatWorld?V3{.16f,.52f,.25f}:V3{.08f,.10f,.12f});
         for(int i=0;i<3;i++)button(-.62f+i*.44f,-.36f,.38f,.18f,selectedSlot==i?V3{.55f,.37f,.12f}:V3{.08f,.10f,.12f});
-        button(-.24f,-.70f,.48f,.22f,{.12f,.42f,.68f});draw(b,GL_TRIANGLES,identity(),0,0,0,false);
+        button(-.24f,-.70f,.48f,.22f,{.12f,.42f,.68f});
+        button(-.45f,.47f,.90f,.11f,{.08f,.22f,.30f});draw(b,GL_TRIANGLES,identity(),0,0,0,false);
+        drawText("NAME: "+playerName,-.40f,.51f,.017f,{1,1,1});
         drawText("CREATIVE",-.55f,.405f,.017f,{1,1,1});drawText("SURVIVAL",.10f,.405f,.017f,{1,1,1});drawText("FLAT",-.48f,.105f,.022f,{1,1,1});drawText("NORMAL",.10f,.105f,.018f,{1,1,1});
         for(int i=0;i<3;i++)drawText("SLOT "+std::to_string(i+1),-.59f+i*.44f,-.30f,.014f,{1,1,1});
-        drawText("START",-.15f,-.63f,.025f,{1,1,1});drawText("MODE",-.08f,.60f,.018f,{.8f,.85f,.9f});drawText("WORLD TYPE",-.20f,.28f,.018f,{.8f,.85f,.9f});drawText("SAVE SLOT",-.18f,-.12f,.018f,{.8f,.85f,.9f});glEnable(GL_DEPTH_TEST);
+        drawText("START",-.15f,-.63f,.025f,{1,1,1});drawText("MODE",-.08f,.60f,.018f,{.8f,.85f,.9f});
+        if(nameEditing){std::vector<float> kb;addFace(kb,{-.72f,-.62f,0},{.72f,-.62f,0},{.72f,.40f,0},{-.72f,.40f,0},{.025f,.04f,.06f});draw(kb,GL_TRIANGLES,identity(),0,0,0,false);drawText("TYPE YOUR NAME",-.28f,.34f,.018f,{.5f,.85f,1});const char* rows[]={"ABCDEFG","HIJKLMN","OPQRSTU","VWXYZ"};for(int r=0;r<4;r++)for(int c=0;rows[r][c];c++)drawText(std::string(1,rows[r][c]),-.61f+c*.19f,.19f-r*.20f,.025f,{1,1,1});drawText("DONE",-.10f,-.53f,.025f,{.5f,1,.6f});}drawText("WORLD TYPE",-.20f,.28f,.018f,{.8f,.85f,.9f});drawText("SAVE SLOT",-.18f,-.12f,.018f,{.8f,.85f,.9f});glEnable(GL_DEPTH_TEST);
     }
     void setJoy(float x,float y){joyX=std::clamp((x-joyOriginX)/.20f,-1.0f,1.0f);joyY=std::clamp((y-joyOriginY)/.20f,-1.0f,1.0f);}
 public:
@@ -593,7 +625,7 @@ public:
     int input(AInputEvent*e){
         if(AInputEvent_getType(e)!=AINPUT_EVENT_TYPE_MOTION)return 0;int action=AMotionEvent_getAction(e)&AMOTION_EVENT_ACTION_MASK,idx=(AMotionEvent_getAction(e)&AMOTION_EVENT_ACTION_POINTER_INDEX_MASK)>>AMOTION_EVENT_ACTION_POINTER_INDEX_SHIFT;int id=AMotionEvent_getPointerId(e,idx);float x=AMotionEvent_getX(e,idx)/width*2-1,y=1-AMotionEvent_getY(e,idx)/height*2;
         if(action==AMOTION_EVENT_ACTION_DOWN||action==AMOTION_EVENT_ACTION_POINTER_DOWN){
-            if(!inWorld){if(y>.32f){creativeMode=x<0;return 1;}if(y>.02f&&y<.27f){flatWorld=x<0;return 1;}if(y>-.40f&&y<-.12f){selectedSlot=std::clamp((int)((x+.62f)/.44f),0,2);return 1;}if(y<-.52f){startWorld();return 1;}return 1;}
+            if(!inWorld){if(nameEditing){if(y<-.43f){nameEditing=false;return 1;}int row=std::clamp((int)((.25f-y)/.20f),0,3);const char* rows[]={"ABCDEFG","HIJKLMN","OPQRSTU","VWXYZ"};int col=std::clamp((int)((x+.70f)/.19f),0,6);if(rows[row][col]&&playerName.size()<16)playerName.push_back(rows[row][col]);return 1;}if(y>.44f&&y<.60f){nameEditing=true;return 1;}if(y>.32f){creativeMode=x<0;return 1;}if(y>.02f&&y<.27f){flatWorld=x<0;return 1;}if(y>-.40f&&y<-.12f){selectedSlot=std::clamp((int)((x+.62f)/.44f),0,2);return 1;}if(y<-.52f){startWorld();return 1;}return 1;}
             if(inventoryOpen){if(x>.62f&&y>.55f){inventoryOpen=false;dragIndex=-1;return 1;}if(x>.55f&&x<.80f&&y>.20f&&y<.43f){craft(0);return 1;}if(x>.55f&&x<.80f&&y>-.08f&&y<.16f){craft(1);return 1;}if(x>.55f&&x<.80f&&y>-.38f&&y<-.12f){craft(2);return 1;}int slot=inventorySlotAt(x,y);if(slot>=0){dragIndex=slot;dragPointer=id;}return 1;}
             if(x>-.95f&&x<-.72f&&y>.55f&&y<.73f){setLanMode(1);return 1;}
             if(x>-.72f&&x<-.47f&&y>.55f&&y<.73f){setLanMode(2);return 1;}
