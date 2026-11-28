@@ -111,10 +111,10 @@
     }
     void drawBlockIcon(uint8_t id,float x,float y,float w,float h){
         std::vector<float> icon;V3 white{1,1,1};
-        if(id==15||id==16){float cx=x+w*.5f;addTri(icon,{cx-w*.06f,y+h*.05f,0},{cx+w*.06f,y+h*.05f,0},{cx+w*.045f,y+h*.67f,0},{.48f,.28f,.12f});addTri(icon,{cx-w*.06f,y+h*.05f,0},{cx+w*.045f,y+h*.67f,0},{cx-w*.045f,y+h*.67f,0},{.60f,.36f,.16f});if(id==15){addTri(icon,{cx-w*.02f,y+h*.68f,0},{x+w*.14f,y+h*.96f,0},{x+w*.48f,y+h*.78f,0},{.57f,.34f,.14f});addTri(icon,{cx-w*.02f,y+h*.68f,0},{x+w*.48f,y+h*.78f,0},{x+w*.84f,y+h*.96f,0},{.57f,.34f,.14f});}else{addTri(icon,{x+w*.12f,y+h*.68f,0},{x+w*.88f,y+h*.68f,0},{x+w*.78f,y+h*.84f,0},{.62f,.39f,.17f});addTri(icon,{x+w*.12f,y+h*.68f,0},{x+w*.78f,y+h*.84f,0},{x+w*.22f,y+h*.84f,0},{.72f,.48f,.22f});}draw(icon,GL_TRIANGLES,identity(),0,0,0,false,false,0,false);return;}
+        if(false && (id==15||id==16)){float cx=x+w*.5f;addTri(icon,{cx-w*.06f,y+h*.05f,0},{cx+w*.06f,y+h*.05f,0},{cx+w*.045f,y+h*.67f,0},{.48f,.28f,.12f});addTri(icon,{cx-w*.06f,y+h*.05f,0},{cx+w*.045f,y+h*.67f,0},{cx-w*.045f,y+h*.67f,0},{.60f,.36f,.16f});if(id==15){addTri(icon,{cx-w*.02f,y+h*.68f,0},{x+w*.14f,y+h*.96f,0},{x+w*.48f,y+h*.78f,0},{.57f,.34f,.14f});addTri(icon,{cx-w*.02f,y+h*.68f,0},{x+w*.48f,y+h*.78f,0},{x+w*.84f,y+h*.96f,0},{.57f,.34f,.14f});}else{addTri(icon,{x+w*.12f,y+h*.68f,0},{x+w*.88f,y+h*.68f,0},{x+w*.78f,y+h*.84f,0},{.62f,.39f,.17f});addTri(icon,{x+w*.12f,y+h*.68f,0},{x+w*.78f,y+h*.84f,0},{x+w*.22f,y+h*.84f,0},{.72f,.48f,.22f});}draw(icon,GL_TRIANGLES,identity(),0,0,0,false,false,0,false);return;}
         if(id==20){float l=x+w*.18f,r=x+w*.82f,b=y+h*.04f,t=y+h*.96f;addFace(icon,{l,b,0},{r,b,0},{r,t,0},{l,t,0},{.58f,.34f,.15f});addFace(icon,{l+.035f,b+.025f,0},{r-.035f,b+.025f,0},{r-.035f,t-.025f,0},{l+.035f,t-.025f,0},{.76f,.49f,.25f});for(int row=0;row<2;row++)for(int col=0;col<2;col++){float hx=l+.16f+col*w*.17f,hy=b+.48f*h+row*h*.17f;addFace(icon,{hx,hy,0},{hx+w*.10f,hy,0},{hx+w*.10f,hy+h*.09f,0},{hx,hy+h*.09f,0},{.22f,.12f,.065f});}draw(icon,GL_TRIANGLES,identity(),0,0,0,false,false,0,false);return;}
         if(id==18){addTri(icon,{x+w*.08f,y+h*.22f,0},{x+w*.92f,y+h*.22f,0},{x+w*.92f,y+h*.62f,0},{.55f,.16f,.18f});addTri(icon,{x+w*.08f,y+h*.22f,0},{x+w*.92f,y+h*.62f,0},{x+w*.08f,y+h*.62f,0},{.88f,.22f,.25f});addTri(icon,{x+w*.12f,y+h*.62f,0},{x+w*.88f,y+h*.62f,0},{x+w*.78f,y+h*.90f,0},{.86f,.88f,.92f});addTri(icon,{x+w*.12f,y+h*.62f,0},{x+w*.78f,y+h*.90f,0},{x+w*.22f,y+h*.90f,0},{1,1,1});draw(icon,GL_TRIANGLES,identity(),0,0,0,false,false,0,false);return;}
-        if(id==12){
+        if(false && id==12){
             float cx=x+w*.5f,hy=y+h*.63f;
             addTri(icon,{cx-w*.055f,y+h*.04f,0},{cx+w*.055f,y+h*.04f,0},{cx+w*.04f,hy,0},{.42f,.23f,.09f});
             addTri(icon,{cx-w*.055f,y+h*.04f,0},{cx+w*.04f,hy,0},{cx-w*.04f,hy,0},{.54f,.32f,.13f});
@@ -123,7 +123,7 @@
             addTri(icon,{x+w*.23f,y+h*.80f,0},{x+w*.77f,y+h*.80f,0},{cx,y+h*.98f,0},{.58f,.64f,.73f});
             draw(icon,GL_TRIANGLES,identity(),0,0,0,false,false,0,false);return;
         }
-        if(id==11){
+        if(false && id==11){
             float cx=x+w*.5f;
             addTri(icon,{cx-w*.11f,y+h*.22f,0},{cx+w*.11f,y+h*.22f,0},{cx,y+h*.98f,0},{.88f,.92f,.98f});
             addTri(icon,{cx-w*.11f,y+h*.22f,0},{cx,y+h*.98f,0},{cx-w*.02f,y+h*.22f,0},{.98f,.99f,1});
@@ -133,7 +133,19 @@
             addTri(icon,{cx-w*.07f,y+h*.18f,0},{cx+w*.06f,y+h*.02f,0},{cx-w*.06f,y+h*.02f,0},{.48f,.28f,.12f});
             draw(icon,GL_TRIANGLES,identity(),0,0,0,false,false,0,false);return;
         }
-        int tile=id==10?5:(id==9?4:(id==3?2:(id==5?3:(id==4?7:(id==13?8:(id==14?9:(id==8?10:(id==7?11:(id==17?8:((id==1)?0:1))))))))));
+        // Use the same atlas textures for inventory and hotbar item icons.
+        int tile = 1;
+        if (id == 1) tile = 0;
+        else if (id == 3) tile = 2;
+        else if (id == 5 || (id >= 24 && id <= 28)) tile = 3;
+        else if (id == 9) tile = 4;
+        else if (id == 10) tile = 5;
+        else if (id == 11) tile = 6;
+        else if (id == 4 || id == 6 || id == 15 || id == 16) tile = 7;
+        else if (id == 12 || id == 13 || id == 17) tile = 8;
+        else if (id == 14 || id == 18) tile = 9;
+        else if (id == 8) tile = 10;
+        else if (id == 7) tile = 11;
         float u0=(tile+.035f)/12.0f,u1=(tile+.965f)/12.0f,v0=.035f,v1=.965f;
         addTri(icon,{x,y,0},{x+w,y,0},{x+w,y+h,0},white,u0,v0,u1,v0,u1,v1);
         addTri(icon,{x,y,0},{x+w,y+h,0},{x,y+h,0},white,u0,v0,u1,v1,u0,v1);
