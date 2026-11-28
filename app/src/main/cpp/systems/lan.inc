@@ -25,7 +25,19 @@
             if(p.type==1&&lanMode==1){LanPacket reply{};reply.type=2;reply.player=networkId;reply.x=px;reply.y=feet;reply.z=pz;reply.yaw=yaw;std::strncpy(reply.name,playerName.c_str(),sizeof(reply.name)-1);sendLan(reply);}
             else if(p.type==2){remoteValid=true;remoteTimer=0;remoteX=p.x;remoteY=p.y;remoteZ=p.z;remoteYaw=p.yaw;remoteName=p.name[0]?p.name:"PLAYER";}
             else if(p.type==3){int cx=floorDiv(p.bx,CS),cz=floorDiv(p.bz,CS);Chunk&c=ensureChunk(cx,cz);c.set(modp(p.bx,CS),p.by,modp(p.bz,CS),p.block);edits[{p.bx,p.by,p.bz}]=p.block;for(auto&entry:chunks)entry.second.dirty=true;}
-            else if(p.type==4&&lanMode==2){khalilX=p.x;khalilFeet=p.y;khalilZ=p.z;khalilAlive=(p.flags&1)!=0;khalilPrimed=(p.flags&2)!=0;}
+            else if(p.type==4&&lanMode==2){khalilX=p.x;khalilFeet=p.y;khalilZ=p.z;khalilAlive=(p.flags&1)!=0;khalilPrimed=(p.flags&2)!=0;khalilHitTimer=(p.flags&4)?.24f:0;khalilHealth=p.block;}
+            else if(p.type==6&&lanMode==1){
+                float mx=(p.flags&1)?grafikX:khalilX,mz=(p.flags&1)?grafikZ:khalilZ;
+                float dx=mx-p.x,dz=mz-p.z,dist=std::sqrt(dx*dx+dz*dz),facing=dist>.001f?(dx*std::sin(p.yaw)-dz*std::cos(p.yaw))/dist:1.0f;
+                if(dist<=3.8f&&facing>.25f){
+                    if(p.flags&1){if(grafikAlive){grafikHealth=std::max(0,grafikHealth-3);grafikHitTimer=.28f;if(grafikHealth<=0){grafikAlive=false;grafikRespawn=0;}}}
+                    else if(khalilAlive){khalilHealth=std::max(0,khalilHealth-3);khalilHitTimer=.28f;if(khalilHealth<=0){khalilAlive=false;khalilRespawn=0;khalilPrimed=false;khalilFuse=0;}}
+                    LanPacket state{};state.type=7;state.player=networkId;state.flags=p.flags&1;state.block=(p.flags&1)?grafikHealth:khalilHealth;sendLan(state);
+                }
+            }
+            else if(p.type==7&&lanMode==2){if(p.flags&1){grafikHealth=p.block;grafikAlive=grafikHealth>0;grafikHitTimer=.28f;}else{khalilHealth=p.block;khalilAlive=khalilHealth>0;khalilHitTimer=.28f;}}
+            else if(p.type==8){DroppedItem item{};item.id=p.block;item.x=p.x;item.y=p.y;item.z=p.z;droppedItems.push_back(item);}
+            else if(p.type==9){for(auto it=droppedItems.begin();it!=droppedItems.end();){float dx=it->x-p.x,dy=it->y-p.y,dz=it->z-p.z;if(dx*dx+dy*dy+dz*dz<.36f&&it->id==p.block){it=droppedItems.erase(it);break;}++it;}}
             else if(p.type==5&&lanMode==2){
                 explosionX=p.x;explosionY=p.y;explosionZ=p.z;explosionEffectTimer=.62f;
                 float dx=px-explosionX,dy=feet+.85f-explosionY,dz=pz-explosionZ,dist=std::sqrt(dx*dx+dy*dy+dz*dz);
@@ -36,7 +48,7 @@
         lanTimer+=dt;helloTimer+=dt;remoteTimer+=dt;
         if(lanTimer>=.10f){lanTimer=0;LanPacket state{};state.type=2;state.player=networkId;state.x=px;state.y=feet;state.z=pz;state.yaw=yaw;std::strncpy(state.name,playerName.c_str(),sizeof(state.name)-1);sendLan(state);}
         if(lanMode==2&&helloTimer>=.50f){helloTimer=0;LanPacket hello{};hello.type=1;hello.player=networkId;sendLan(hello);}
-        if(lanMode==1&&lanTimer==0.0f){LanPacket monster{};monster.type=4;monster.player=networkId;monster.x=khalilX;monster.y=khalilFeet;monster.z=khalilZ;monster.flags=(khalilAlive?1:0)|(khalilPrimed?2:0);sendLan(monster);}
+        if(lanMode==1&&lanTimer==0.0f){LanPacket monster{};monster.type=4;monster.player=networkId;monster.x=khalilX;monster.y=khalilFeet;monster.z=khalilZ;monster.flags=(khalilAlive?1:0)|(khalilPrimed?2:0)|(khalilHitTimer>0?4:0);monster.block=(uint8_t)std::clamp(khalilHealth,0,255);sendLan(monster);}
         if(remoteTimer>3.0f)remoteValid=false;
     }
 
