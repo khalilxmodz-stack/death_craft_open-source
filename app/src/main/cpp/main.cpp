@@ -25,7 +25,7 @@
 #include "stb_image.h"
 
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR,"DeathCraft",__VA_ARGS__)
-static constexpr int CS=16, HEIGHT=32, LOAD_RADIUS=5;
+static constexpr int CS=16, HEIGHT=32, LOAD_RADIUS=7;
 static constexpr float PI=3.14159265f;
 static constexpr int SEA_LEVEL=6;
 
