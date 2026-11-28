@@ -24,7 +24,7 @@
             if(p.magic!=0x44434654u||p.player==networkId)continue;
             if(p.type==1&&lanMode==1){LanPacket reply{};reply.type=2;reply.player=networkId;reply.x=px;reply.y=feet;reply.z=pz;reply.yaw=yaw;std::strncpy(reply.name,playerName.c_str(),sizeof(reply.name)-1);sendLan(reply);}
             else if(p.type==2){remoteValid=true;remoteTimer=0;remoteX=p.x;remoteY=p.y;remoteZ=p.z;remoteYaw=p.yaw;remoteName=p.name[0]?p.name:"PLAYER";}
-            else if(p.type==3){int cx=floorDiv(p.bx,CS),cz=floorDiv(p.bz,CS);Chunk&c=ensureChunk(cx,cz);c.set(modp(p.bx,CS),p.by,modp(p.bz,CS),p.block);edits[{p.bx,p.by,p.bz}]=p.block;for(auto&entry:chunks)entry.second.dirty=true;}
+            else if(p.type==3){int cx=floorDiv(p.bx,CS),cz=floorDiv(p.bz,CS);Chunk&c=ensureChunk(cx,cz);c.set(modp(p.bx,CS),p.by,modp(p.bz,CS),p.block);edits[{p.bx,p.by,p.bz}]=p.block;waterFlowDepth.erase({p.bx,p.by,p.bz});for(auto&entry:chunks)entry.second.dirty=true;}
             else if(p.type==4&&lanMode==2){khalilX=p.x;khalilFeet=p.y;khalilZ=p.z;khalilAlive=(p.flags&1)!=0;khalilPrimed=(p.flags&2)!=0;khalilHitTimer=(p.flags&4)?.24f:0;khalilHealth=p.block;}
             else if(p.type==6&&lanMode==1){
                 float mx=(p.flags&1)?grafikX:khalilX,mz=(p.flags&1)?grafikZ:khalilZ;
