@@ -1,6 +1,7 @@
 // Subsystem: UDP LAN discovery, packet exchange, and multiplayer state synchronization.
 // Function comments describe each method's responsibility and its place in the game systems.
 
+    // Starts or configures the host or client LAN session.
     void setLanMode(int mode){
         if(lanSocket<0){
             lanSocket=socket(AF_INET,SOCK_DGRAM,0);
@@ -19,7 +20,9 @@
         lanMode=mode;remoteValid=false;remoteTimer=0;lanTimer=0;helloTimer=0;
         status=mode==1?"LAN HOSTING - WAITING":"LAN SEARCHING FOR HOST";statusFrames=180;
     }
+    // Broadcasts one game-state packet to LAN peers.
     void sendLan(const LanPacket&p){if(lanSocket>=0)sendto(lanSocket,&p,sizeof(p),0,(sockaddr*)&lanBroadcast,sizeof(lanBroadcast));}
+    // Receives LAN packets and synchronizes players and world entities.
     void updateLan(float dt){
         if(lanSocket<0||lanMode==0)return;
         LanPacket p{};sockaddr_in from{};socklen_t fromLen=sizeof(from);
