@@ -148,8 +148,8 @@ static uint64_t chunkKey(int x, int z) {
 struct Chunk {
     int cx = 0, cz = 0;
     std::array<uint8_t, CS * CS * HEIGHT> blocks{};
-    std::vector<float> mesh;
-    std::vector<float> shadowMesh;
+    std::vector<float> mesh;  // Visible textured geometry prepared for rendering.
+    std::vector<float> shadowMesh;  // Geometry used by the shadow pass.
     GLuint meshVbo = 0;
     GLsizei meshVertexCount = 0;
     bool dirty = true;
