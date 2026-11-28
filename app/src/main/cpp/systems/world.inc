@@ -29,7 +29,7 @@
         creativeMode=mode!=0;flatWorld=flat!=0;health=std::clamp(hp,0,10);armor=std::clamp(ap,0,10);selected=std::clamp(sel,0,4);return true;
     }
     void startWorld(){
-        chunks.clear();edits.clear();inventory={};health=10;armor=10;grafikHealth=2;grafikAlive=true;playerDead=false;swallowTimer=0;
+        chunks.clear();edits.clear();inventory={};health=10;armor=10;grafikHealth=6;grafikHitTimer=0;grafikAlive=true;playerDead=false;swallowTimer=0;
         px=0;pz=0;yaw=0;pitch=0;vy=0;feet=(float)groundHeight(0,0);grounded=true;
         bool loaded=loadWorld();
         if(loaded){bool hasTnt=false,hasSword=false;for(const auto&i:inventory){if(i.id==10&&i.count>0)hasTnt=true;if(i.id==11&&i.count>0)hasSword=true;}if(!hasTnt){if(inventory[4].id==5)inventory[8]=inventory[4];inventory[4]=Item{10,creativeMode?999999:4};}if(!hasSword)inventory[9]=Item{11,creativeMode?999999:1};}
@@ -43,7 +43,7 @@
             inventory[6]=creativeMode?Item{7,999999}:Item{7,0};inventory[7]=creativeMode?Item{8,999999}:Item{8,0};inventory[8]=creativeMode?Item{5,999999}:Item{5,8};inventory[9]=creativeMode?Item{11,999999}:Item{11,1};
         }
         if(creativeMode)for(auto&i:inventory)if(i.id)i.count=999999;
-        grafikX=6;grafikZ=-5;grafikFeet=(float)groundHeight(6,-5);khalilX=px+9.0f;khalilZ=pz+4.0f;khalilFeet=(float)groundHeight((int)khalilX,(int)khalilZ);khalilAlive=true;khalilPrimed=false;khalilFuse=0;khalilRespawn=0;explosionEffectTimer=0;deathMessage="GRAFIK ATE YOU";selected=0;inWorld=true;saveTimer=0;updateWorld();status=loaded?"WORLD LOADED":"WORLD CREATED";statusFrames=120;
+        grafikX=6;grafikZ=-5;grafikFeet=(float)groundHeight(6,-5);khalilX=px+9.0f;khalilZ=pz+4.0f;khalilFeet=(float)groundHeight((int)khalilX,(int)khalilZ);khalilAlive=true;khalilHealth=8;khalilHitTimer=0;khalilPrimed=false;khalilFuse=0;khalilRespawn=0;explosionEffectTimer=0;deathMessage="GRAFIK ATE YOU";selected=0;inWorld=true;saveTimer=0;updateWorld();status=loaded?"WORLD LOADED":"WORLD CREATED";statusFrames=120;
     }
     uint8_t blockAt(int x,int y,int z)const{
         int cx=floorDiv(x,CS),cz=floorDiv(z,CS);auto it=chunks.find(chunkKey(cx,cz));
