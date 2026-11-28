@@ -35,10 +35,36 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y clang-format
 
-      - name: Format project C++ sources
+      - name: Format C++ and class-include files
         shell: bash
         run: |
-          find app/src/main/cpp -type f \( -name '*.cpp' -o -name '*.h' -o -name '*.hpp' -o -name '*.inc' \) ! -name 'stb_image.h' -print0 | xargs -0 -r clang-format -i
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+
+          root = Path("app/src/main/cpp")
+
+          # Format regular C++ translation units and headers directly.
+          for path in root.rglob("*"):
+              if path.suffix in {".cpp", ".h", ".hpp"} and path.name != "stb_image.h":
+                  subprocess.run(["clang-format", "-i", str(path)], check=True)
+
+          # The .inc files are included inside Game, so format them as class members.
+          for path in root.rglob("*.inc"):
+              source = path.read_text(encoding="utf-8")
+              wrapped = "class __FormatWrapper {\n" + source + "\n};\n"
+              result = subprocess.run(
+                  ["clang-format"],
+                  input=wrapped,
+                  text=True,
+                  capture_output=True,
+                  check=True,
+              )
+              lines = result.stdout.splitlines()
+              if not lines or lines[0].strip() != "class __FormatWrapper {" or lines[-1].strip() != "};":
+                  raise RuntimeError(f"Unexpected clang-format wrapper output for {path}")
+              path.write_text("\n".join(lines[1:-1]) + "\n", encoding="utf-8")
+          PY
 
       - name: Commit formatted sources
         run: |
