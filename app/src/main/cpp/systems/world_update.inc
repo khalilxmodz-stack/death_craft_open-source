@@ -1,6 +1,7 @@
 // Subsystem: Per-frame world simulation, entities, environmental effects, and world rendering.
 // Function comments describe each method's responsibility and its place in the game systems.
 
+    // Streams nearby chunks and schedules world simulation updates.
     void updateWorld(){
         int cx=floorDiv((int)std::floor(px),CS),cz=floorDiv((int)std::floor(pz),CS);
         // Stream a few nearby chunks per frame; keep generation out of a single long frame.
@@ -26,7 +27,9 @@
             if(it!=chunks.end()&&it->second.dirty)rebuild(it->second);
         }
     }
+    // Reports whether the current world clock is in its night period.
     bool isNight()const{return std::sin(dayClock/1200.0f*2.0f*PI)<-.08f;}
+    // Updates sky lighting and colors from the current time of day.
     void updateSky(){
         float phase=dayClock/1200.0f;
         float daylight=std::clamp(std::sin(phase*2.0f*PI)*2.4f+.15f,0.0f,1.0f);
@@ -36,6 +39,7 @@
         float dusk=std::clamp(1.0f-std::abs(sunHeight)*3.2f,0.0f,1.0f)*(1.0f-daylight);
         skyTint={skyTint.x+(dawn.x-skyTint.x)*dusk*.42f,skyTint.y+(dawn.y-skyTint.y)*dusk*.42f,skyTint.z+(dawn.z-skyTint.z)*dusk*.42f};
     }
+    // Renders sky decorations such as the sun, moon, and stars.
     void drawSkyDecor(const Mat4&vp){
         const float phase=dayClock/1200.0f,angle=phase*2.0f*PI;
         const float daylight=std::clamp(std::sin(angle)*2.4f+.15f,0.0f,1.0f);
@@ -99,11 +103,13 @@
         }
         glDisable(GL_DEPTH_TEST);draw(v,GL_TRIANGLES,vp,px,feet+1.62f,pz,false,false);glEnable(GL_DEPTH_TEST);
     }
+    // Creates a world item entity at the supplied position.
     void spawnDroppedItem(uint8_t id,float x,float y,float z,int count=1){
         if(!id)return;
         DroppedItem item{};item.id=id;item.count=std::max(1,count);item.x=x;item.y=y;item.z=z;item.vx=std::sin(yaw)*.9f;item.vy=1.6f;item.vz=-std::cos(yaw)*.9f;droppedItems.push_back(item);
         if(lanMode){LanPacket packet{};packet.type=8;packet.player=networkId;packet.block=id;packet.flags=(uint8_t)std::clamp(item.count,1,255);packet.x=x;packet.y=y;packet.z=z;sendLan(packet);}
     }
+    // Creates the dropped item and particles for a broken block.
     void spawnBlockEffects(int x,int y,int z,uint8_t id){
         DroppedItem item{};item.id=id;item.x=x+.5f;item.y=y+.48f;item.z=z+.5f;
         uint32_t h=terrainHash(x*7+id,y*13+z);
@@ -116,6 +122,7 @@
             blockParticles.push_back(p);
         }
     }
+    // Advances water flow and updates affected block regions.
     void updateWaterSimulation(float dt){
         if(lanMode==2)return; // LAN clients display the host's authoritative fluid updates.
         waterSimulationTimer+=dt;
@@ -170,6 +177,7 @@
             }
         }
     }
+    // Renders the sword held by the first-person player.
     void drawHeldSword(const Mat4&vp){
         if(selected<0||selected>=(int)inventory.size()||inventory[selected].count<=0||inventory[selected].id!=11)return;
         V3 right{std::cos(yaw),0,std::sin(yaw)};
@@ -215,6 +223,7 @@
         box(-.055f,.035f,-.055f,.055f,.075f,.055f,{.88f,.90f,.94f});
         glDisable(GL_DEPTH_TEST);draw(mesh,GL_TRIANGLES,vp,px,feet+1.62f,pz,false,false);glEnable(GL_DEPTH_TEST);
     }
+    // Renders the pickaxe held by the first-person player.
     void drawHeldPickaxe(const Mat4&vp){
         if(selected<0||selected>=(int)inventory.size()||inventory[selected].count<=0||(inventory[selected].id!=12&&inventory[selected].id!=16))return;
         V3 right{std::cos(yaw),0,std::sin(yaw)};
@@ -251,6 +260,7 @@
         box(-.12f,.30f,-.085f,.12f,.405f,.085f,wooden?V3{.72f,.48f,.22f}:V3{.84f,.88f,.94f});
         glDisable(GL_DEPTH_TEST);draw(mesh,GL_TRIANGLES,vp,px,feet+1.62f,pz,false,false);glEnable(GL_DEPTH_TEST);
     }
+    // Renders the wooden axe held by the first-person player.
     void drawHeldWoodAxe(const Mat4&vp){
         if(selected<0||selected>=(int)inventory.size()||inventory[selected].count<=0||inventory[selected].id!=15)return;
         V3 right{std::cos(yaw),0,std::sin(yaw)},up{-std::sin(yaw)*std::sin(pitch),std::cos(pitch),std::cos(yaw)*std::sin(pitch)},forward{std::sin(yaw)*std::cos(pitch),std::sin(pitch),-std::cos(yaw)*std::cos(pitch)};
@@ -263,6 +273,7 @@
         q({-.05f,.34f,.07f},{-.32f,.28f,.07f},{-.38f,.51f,.07f},{-.05f,.58f,.07f},{.43f,.25f,.10f});
         glDisable(GL_DEPTH_TEST);draw(mesh,GL_TRIANGLES,vp,px,feet+1.62f,pz,false,false);glEnable(GL_DEPTH_TEST);
     }
+    // Selects and renders the currently equipped first-person item.
     void drawHeldItem(const Mat4&vp){
         if(selected<0||selected>=(int)inventory.size()||inventory[selected].count<=0)return;
         uint8_t id=inventory[selected].id;if(id==11||id==12||id==15||id==16)return;
@@ -284,6 +295,7 @@
         face(a,b,c,d,col);face(ff,e,h,g,{col.x*.7f,col.y*.7f,col.z*.7f});face(e,a,d,h,{col.x*.85f,col.y*.85f,col.z*.85f});face(b,ff,g,c,{col.x*.6f,col.y*.6f,col.z*.6f});face(d,c,g,h,{col.x*1.1f,col.y*1.1f,col.z*1.1f});face(e,ff,b,a,{col.x*.5f,col.y*.5f,col.z*.5f});
         glDisable(GL_DEPTH_TEST);draw(mesh,GL_TRIANGLES,vp,px,feet+1.62f,pz,false,false);glEnable(GL_DEPTH_TEST);
     }
+    // Updates dropped items, particles, projectiles, and temporary effects.
     void updateWorldEffects(float dt){
         for(auto it=droppedItems.begin();it!=droppedItems.end();){
             it->age+=dt;it->vy-=12.0f*dt;it->x+=it->vx*dt;it->y+=it->vy*dt;it->z+=it->vz*dt;
@@ -300,6 +312,7 @@
             if(it->life<=0){it=blockParticles.erase(it);continue;}++it;
         }
     }
+    // Renders world-space item drops and block-break effects.
     void drawWorldEffects(const Mat4&vp){
         std::vector<float>v;
         auto cube=[&](float x,float y,float z,float s,V3 color){
@@ -312,6 +325,7 @@
         draw(v,GL_TRIANGLES,vp,px,feet+1.62f,pz,true,false);
     }
 
+    // Advances TNT fuses and processes explosions.
     void updateTnt(float dt){
         for(auto it=primedTnts.begin();it!=primedTnts.end();){
             it->fuse-=dt;
@@ -340,6 +354,7 @@
             it=primedTnts.erase(it);
         }
     }
+    // Updates the Khalil monster's movement, attacks, and network state.
     void updateKhalil(float dt){
         khalilHitTimer=std::max(0.0f,khalilHitTimer-dt);
         if(explosionEffectTimer>0)explosionEffectTimer=std::max(0.0f,explosionEffectTimer-dt);
@@ -384,6 +399,7 @@
             khalilAlive=false;khalilRespawn=0;khalilPrimed=false;khalilFuse=0;
         }
     }
+    // Renders the Khalil monster and its current visual state.
     void drawKhalil(const Mat4&vp){
         if(khalilAlive){
             std::vector<float> sphere;
@@ -423,6 +439,7 @@
             draw(blast,GL_TRIANGLES,vp,px,feet+1.62f,pz,true,false);
         }
     }
+    // Updates skeleton movement, attacks, and projectile behavior.
     void updateSkeleton(float dt){
         skeletonHitTimer=std::max(0.0f,skeletonHitTimer-dt);
         if(!isNight()){skeletonAlive=false;skeletonArrows.clear();return;}
@@ -448,6 +465,7 @@
             it->x=nx;it->y=ny;it->z=nz;++it;
         }
     }
+    // Renders the skeleton and its health or attack indicators.
     void drawSkeleton(const Mat4&vp){
         if(!skeletonAlive&&skeletonArrows.empty())return;std::vector<float> mesh;
         auto cube=[&](float x,float y,float z,float w,float h,float d,V3 col){float c=std::cos(skeletonYaw),s=std::sin(skeletonYaw);auto pt=[&](float lx,float ly,float lz){return V3{skeletonX+lx*c+lz*s,skeletonFeet+ly,skeletonZ-lx*s+lz*c};};V3 a=pt(x-w*.5f,y,z-d*.5f),b=pt(x+w*.5f,y,z-d*.5f),cc=pt(x+w*.5f,y+h,z-d*.5f),dd=pt(x-w*.5f,y+h,z-d*.5f),e=pt(x-w*.5f,y,z+d*.5f),f=pt(x+w*.5f,y,z+d*.5f),g=pt(x+w*.5f,y+h,z+d*.5f),hh=pt(x-w*.5f,y+h,z+d*.5f);addFace(mesh,a,b,cc,dd,col);addFace(mesh,f,e,hh,g,col);addFace(mesh,e,a,dd,hh,col);addFace(mesh,b,f,g,cc,col);addFace(mesh,dd,cc,g,hh,col);addFace(mesh,e,f,b,a,col);};
@@ -457,6 +475,7 @@
         for(const auto&a:skeletonArrows){V3 tip{a.x+a.vx*.035f,a.y+a.vy*.035f,a.z+a.vz*.035f},tail{a.x-a.vx*.035f,a.y-a.vy*.035f,a.z-a.vz*.035f};addFace(mesh,{tail.x-.018f,tail.y-.018f,tail.z},{tip.x-.018f,tip.y-.018f,tip.z},{tip.x+.018f,tip.y+.018f,tip.z},{tail.x+.018f,tail.y+.018f,tail.z},{.42f,.28f,.14f});}
         draw(mesh,GL_TRIANGLES,vp,px,feet+1.62f,pz,false,false);
     }
+    // Runs one game frame, including simulation, rendering, and HUD updates.
     void frame(float dt){
         fpsAccumulator+=dt;fpsFrames++;if(fpsAccumulator>=0.5f){fpsValue=fpsFrames/fpsAccumulator;fpsFrames=0;fpsAccumulator=0;}
         if(!running||!eglMakeCurrent(display,surface,surface,context))return;dt=std::min(dt,.04f);swordCooldown=std::max(0.0f,swordCooldown-dt);
