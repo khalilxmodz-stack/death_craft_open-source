@@ -1,3 +1,6 @@
+// Subsystem: UDP LAN discovery, packet exchange, and multiplayer state synchronization.
+// Function comments describe each method's responsibility and its place in the game systems.
+
     void setLanMode(int mode){
         if(lanSocket<0){
             lanSocket=socket(AF_INET,SOCK_DGRAM,0);
