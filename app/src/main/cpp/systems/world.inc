@@ -1,3 +1,6 @@
+// Subsystem: World data, terrain generation, persistence, block lookup, and collision helpers.
+// Function comments describe each method's responsibility and its place in the game systems.
+
     int groundHeight(int x,int z)const{return flatWorld?8:terrainHeight(x,z);}
     bool inWater()const{int x=(int)std::floor(px),z=(int)std::floor(pz);for(int y=(int)std::floor(feet+.15f);y<=(int)std::floor(feet+1.65f);y++)if(blockAt(x,y,z)==9)return true;return false;}
     std::string savePath()const{return saveDirectory+"/deathcraft_world_"+std::to_string(selectedSlot)+".dat";}
