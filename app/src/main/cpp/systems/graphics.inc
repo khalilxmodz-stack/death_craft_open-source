@@ -2,7 +2,7 @@
     // Function comments describe each method's responsibility and its place in the game systems.
 
     // Compiles one OpenGL ES shader and reports compilation errors.
-    GLuint makeShader(GLenum type, const char* src) {
+    GLenum type, const char* src) {
         GLuint s = glCreateShader(type);
         glShaderSource(s, 1, &src, nullptr);
         glCompileShader(s);
@@ -16,7 +16,7 @@
         return s;
     }
     // Creates the OpenGL ES program and configures graphics resources.
-    bool setupGL() {
+    ) {
         const char* vs = R"(#version 300 es
         layout(location=0) in vec3 p; layout(location=1) in vec3 c; layout(location=2) in vec2 uvIn;
         uniform mat4 mvp; uniform vec3 cameraPos; uniform float animTime; uniform float waterAnimation; out vec3 color; out float fogDistance; out vec2 texCoord;
@@ -57,7 +57,7 @@
         return true;
     }
     // Appends a triangle and its vertex attributes to a mesh buffer.
-    void addTri(std::vector<float>& v,
+    std::vector<float>& v,
                 V3 a,
                 V3 b,
                 V3 c,
@@ -73,13 +73,13 @@
                            c.x, c.y, c.z, color.x, color.y, color.z, cu, cv});
     }
     // Appends a colored quad as two triangles.
-    void addFace(std::vector<float>& v, V3 a, V3 b, V3 c, V3 d, V3 color) {
+    std::vector<float>& v, V3 a, V3 b, V3 c, V3 d, V3 color) {
         addTri(v, a, b, c, color, 0, 0, 1, 0, 1, 1);
         addTri(v, a, c, d, color, 0, 0, 1, 1, 0, 1);
     }
 
     // Applies the selected texture filtering mode.
-    void applyGraphicsFiltering() {
+    ) {
         GLenum filter = smoothGraphics ? GL_LINEAR : GL_NEAREST;
         if (atlasTexture) {
             glBindTexture(GL_TEXTURE_2D, atlasTexture);
@@ -95,7 +95,7 @@
         }
     }
     // Loads the texture used by the Khalil character.
-    void loadKhalilTexture(AAssetManager* manager) {
+    AAssetManager* manager) {
         std::vector<unsigned char> pixels;
         int w = 1, h = 1, channels = 4;
         unsigned char white[4] = {255, 255, 255, 255};
@@ -140,7 +140,7 @@
     }
 
     // Loads the block atlas and other game textures.
-    bool loadTextures(AAssetManager* manager) {
+    AAssetManager* manager) {
         if (!manager)
             return false;
         constexpr int tile = 256, atlasTiles = 12, atlasW = tile * atlasTiles;
