@@ -196,7 +196,7 @@
         glDisable(GL_DEPTH_TEST);draw(mesh,GL_TRIANGLES,vp,px,feet+1.62f,pz,false,false);glEnable(GL_DEPTH_TEST);
     }
     void drawHeldPickaxe(const Mat4&vp){
-        if(selected<0||selected>=(int)inventory.size()||inventory[selected].count<=0||inventory[selected].id!=12)return;
+        if(selected<0||selected>=(int)inventory.size()||inventory[selected].count<=0||(inventory[selected].id!=12&&inventory[selected].id!=16))return;
         V3 right{std::cos(yaw),0,std::sin(yaw)};
         V3 up{-std::sin(yaw)*std::sin(pitch),std::cos(pitch),std::cos(yaw)*std::sin(pitch)};
         V3 forward{std::sin(yaw)*std::cos(pitch),std::sin(pitch),-std::cos(yaw)*std::cos(pitch)};
@@ -219,15 +219,28 @@
             quad(d,c,g,h,{std::min(1.0f,color.x*1.12f),std::min(1.0f,color.y*1.12f),std::min(1.0f,color.z*1.12f)});
             quad(e,f,b,a,{color.x*.58f,color.y*.58f,color.z*.62f});
         };
-        // Carved brown wooden shaft with a dark grip and metal collar.
+        bool wooden=inventory[selected].id==16;
+        // Wooden handle and a wooden or iron pick head.
         box(-.045f,-.34f,-.045f,.045f,.31f,.045f,{.42f,.24f,.10f});
         box(-.052f,-.31f,-.052f,.052f,-.22f,.052f,{.25f,.13f,.055f});
-        box(-.055f,.22f,-.060f,.055f,.29f,.060f,{.60f,.64f,.69f});
-        // Broad silver pick head, beveled centre and tapered pointed ends.
-        box(-.30f,.28f,-.075f,.30f,.37f,.075f,{.68f,.73f,.80f});
-        quad({-.30f,.28f,-.075f},{-.43f,.20f,0},{-.30f,.37f,-.075f},{-.30f,.37f,.075f},{.78f,.82f,.88f});
-        quad({.30f,.28f,.075f},{.43f,.20f,0},{.30f,.37f,.075f},{.30f,.28f,-.075f},{.52f,.58f,.67f});
-        box(-.12f,.30f,-.085f,.12f,.405f,.085f,{.84f,.88f,.94f});
+        box(-.055f,.22f,-.060f,.055f,.29f,.060f,wooden?V3{.42f,.25f,.11f}:V3{.60f,.64f,.69f});
+        V3 head=wooden?V3{.55f,.34f,.15f}:V3{.68f,.73f,.80f};
+        box(-.30f,.28f,-.075f,.30f,.37f,.075f,head);
+        quad({-.30f,.28f,-.075f},{-.43f,.20f,0},{-.30f,.37f,-.075f},{-.30f,.37f,.075f},wooden?V3{.68f,.44f,.20f}:V3{.78f,.82f,.88f});
+        quad({.30f,.28f,.075f},{.43f,.20f,0},{.30f,.37f,.075f},{.30f,.28f,-.075f},wooden?V3{.36f,.20f,.08f}:V3{.52f,.58f,.67f});
+        box(-.12f,.30f,-.085f,.12f,.405f,.085f,wooden?V3{.72f,.48f,.22f}:V3{.84f,.88f,.94f});
+        glDisable(GL_DEPTH_TEST);draw(mesh,GL_TRIANGLES,vp,px,feet+1.62f,pz,false,false);glEnable(GL_DEPTH_TEST);
+    }
+    void drawHeldWoodAxe(const Mat4&vp){
+        if(selected<0||selected>=(int)inventory.size()||inventory[selected].count<=0||inventory[selected].id!=15)return;
+        V3 right{std::cos(yaw),0,std::sin(yaw)},up{-std::sin(yaw)*std::sin(pitch),std::cos(pitch),std::cos(yaw)*std::sin(pitch)},forward{std::sin(yaw)*std::cos(pitch),std::sin(pitch),-std::cos(yaw)*std::cos(pitch)};
+        V3 origin{px+forward.x*.68f+right.x*.34f-up.x*.34f,feet+1.62f+forward.y*.68f+right.y*.34f-up.y*.34f,pz+forward.z*.68f+right.z*.34f-up.z*.34f};
+        auto point=[&](float x,float y,float z){return V3{origin.x+right.x*x*.86f+up.x*y*.86f+forward.x*z*.86f,origin.y+right.y*x*.86f+up.y*y*.86f+forward.y*z*.86f,origin.z+right.z*x*.86f+up.z*y*.86f+forward.z*z*.86f};};
+        std::vector<float> mesh;auto q=[&](V3 a,V3 b,V3 c,V3 d,V3 col){addFace(mesh,point(a.x,a.y,a.z),point(b.x,b.y,b.z),point(c.x,c.y,c.z),point(d.x,d.y,d.z),col);};
+        auto box=[&](float x0,float y0,float z0,float x1,float y1,float z1,V3 col){V3 a{x0,y0,z0},b{x1,y0,z0},c{x1,y1,z0},d{x0,y1,z0},e{x0,y0,z1},f{x1,y0,z1},g{x1,y1,z1},h{x0,y1,z1};q(a,b,c,d,col);q(f,e,h,g,col);q(e,a,d,h,col);q(b,f,g,c,col);q(d,c,g,h,col);q(e,f,b,a,col);};
+        box(-.045f,-.34f,-.045f,.045f,.34f,.045f,{.46f,.27f,.11f});box(-.06f,.18f,-.07f,.06f,.28f,.07f,{.30f,.16f,.06f});
+        q({-.05f,.34f,-.07f},{-.05f,.58f,-.07f},{-.38f,.51f,-.07f},{-.32f,.28f,-.07f},{.65f,.41f,.18f});
+        q({-.05f,.34f,.07f},{-.32f,.28f,.07f},{-.38f,.51f,.07f},{-.05f,.58f,.07f},{.43f,.25f,.10f});
         glDisable(GL_DEPTH_TEST);draw(mesh,GL_TRIANGLES,vp,px,feet+1.62f,pz,false,false);glEnable(GL_DEPTH_TEST);
     }
     void updateWorldEffects(float dt){
@@ -368,11 +381,28 @@
             draw(blast,GL_TRIANGLES,vp,px,feet+1.62f,pz,true,false);
         }
     }
+    void updateSkeleton(float dt){
+        skeletonHitTimer=std::max(0.0f,skeletonHitTimer-dt);
+        if(!skeletonAlive){skeletonRespawn+=dt;if(skeletonRespawn>22.0f){skeletonAlive=true;skeletonHealth=8;skeletonX=px+8.0f;skeletonZ=pz+5.0f;skeletonFeet=(float)groundHeight((int)skeletonX,(int)skeletonZ);skeletonShootTimer=1.2f;}return;}
+        float dx=px-skeletonX,dz=pz-skeletonZ,dist=std::sqrt(dx*dx+dz*dz);if(dist<.001f)return;skeletonYaw=std::atan2(dx,-dz);int gh=groundHeight((int)std::floor(skeletonX),(int)std::floor(skeletonZ));skeletonFeet=(float)gh;
+        if(!creativeMode&&!playerDead){if(dist>8.0f){float step=std::min(1.15f*dt,dist-7.0f);float nx=skeletonX+dx/dist*step,nz=skeletonZ+dz/dist*step;int nh=groundHeight((int)std::floor(nx),(int)std::floor(nz));if(std::abs(nh-skeletonFeet)<=1){skeletonX=nx;skeletonZ=nz;skeletonFeet=(float)nh;}}else if(dist<5.0f){float step=std::min(.85f*dt,5.4f-dist);float nx=skeletonX-dx/dist*step,nz=skeletonZ-dz/dist*step;int nh=groundHeight((int)std::floor(nx),(int)std::floor(nz));if(std::abs(nh-skeletonFeet)<=1){skeletonX=nx;skeletonZ=nz;skeletonFeet=(float)nh;}}
+            skeletonShootTimer-=dt;if(dist>=3.5f&&dist<=13.0f&&skeletonShootTimer<=0){ArrowProjectile a{};a.x=skeletonX+std::sin(skeletonYaw)*.38f;a.y=skeletonFeet+1.34f;a.z=skeletonZ-std::cos(skeletonYaw)*.38f;float vx=px-a.x,vy=(feet+1.05f)-a.y,vz=pz-a.z;float d=std::sqrt(vx*vx+vy*vy+vz*vz);if(d>.01f){float speed=9.0f;a.vx=vx/d*speed;a.vy=vy/d*speed+.9f;a.vz=vz/d*speed;a.life=2.3f;skeletonArrows.push_back(a);}skeletonShootTimer=2.15f+(terrainHash((int)px,(int)pz)%70)/100.0f;}}
+        for(auto it=skeletonArrows.begin();it!=skeletonArrows.end();){it->life-=dt;it->vy-=5.8f*dt;it->x+=it->vx*dt;it->y+=it->vy*dt;it->z+=it->vz*dt;float ax=it->x-px,ay=it->y-(feet+1.0f),az=it->z-pz;if(!creativeMode&&!playerDead&&ax*ax+ay*ay+az*az<.55f){int damage=2;int absorbed=std::min(armor,damage);armor-=absorbed;damage-=absorbed;health=std::max(0,health-damage);status="SKELETON ARROW HIT";statusFrames=70;if(health<=0){playerDead=true;swallowTimer=.001f;deathMessage="SHOT BY SKELETON";}it=skeletonArrows.erase(it);continue;}if(it->life<=0||it->y<0){it=skeletonArrows.erase(it);continue;}++it;}
+    }
+    void drawSkeleton(const Mat4&vp){
+        if(!skeletonAlive&&skeletonArrows.empty())return;std::vector<float> mesh;
+        auto cube=[&](float x,float y,float z,float w,float h,float d,V3 col){float c=std::cos(skeletonYaw),s=std::sin(skeletonYaw);auto pt=[&](float lx,float ly,float lz){return V3{skeletonX+lx*c+lz*s,skeletonFeet+ly,skeletonZ-lx*s+lz*c};};V3 a=pt(x-w*.5f,y,z-d*.5f),b=pt(x+w*.5f,y,z-d*.5f),cc=pt(x+w*.5f,y+h,z-d*.5f),dd=pt(x-w*.5f,y+h,z-d*.5f),e=pt(x-w*.5f,y,z+d*.5f),f=pt(x+w*.5f,y,z+d*.5f),g=pt(x+w*.5f,y+h,z+d*.5f),hh=pt(x-w*.5f,y+h,z+d*.5f);addFace(mesh,a,b,cc,dd,col);addFace(mesh,f,e,hh,g,col);addFace(mesh,e,a,dd,hh,col);addFace(mesh,b,f,g,cc,col);addFace(mesh,dd,cc,g,hh,col);addFace(mesh,e,f,b,a,col);};
+        if(skeletonAlive){V3 bone=skeletonHitTimer>0?V3{1,.25f,.22f}:V3{.82f,.83f,.78f};V3 dark{.12f,.12f,.13f};cube(0,1.42f,0,.30f,.32f,.27f,bone);cube(0,1.00f,0,.22f,.48f,.18f,bone);cube(0,.82f,0,.27f,.13f,.22f,{.68f,.69f,.65f});cube(-.10f,.08f,0,.09f,.70f,.10f,bone);cube(.10f,.08f,0,.09f,.70f,.10f,bone);cube(-.22f,.98f,0,.08f,.58f,.09f,bone);cube(.22f,.98f,0,.08f,.58f,.09f,bone);cube(-.10f,1.55f,-.139f,.055f,.055f,.025f,dark);cube(.10f,1.55f,-.139f,.055f,.055f,.025f,dark);
+            float c=std::cos(skeletonYaw),s=std::sin(skeletonYaw);auto pt=[&](float lx,float ly,float lz){return V3{skeletonX+lx*c+lz*s,skeletonFeet+ly,skeletonZ-lx*s+lz*c};};V3 p0=pt(-.38f,.75f,-.12f),p1=pt(-.52f,1.02f,-.12f),p2=pt(-.40f,1.34f,-.12f),p3=pt(-.34f,1.60f,-.12f);addFace(mesh,pt(-.42f,.75f,-.15f),pt(-.34f,.75f,-.15f),pt(-.44f,1.02f,-.15f),pt(-.52f,1.02f,-.15f),{.42f,.23f,.09f});addFace(mesh,pt(-.52f,1.02f,-.15f),pt(-.44f,1.02f,-.15f),pt(-.40f,1.34f,-.15f),pt(-.48f,1.34f,-.15f),{.48f,.27f,.10f});addFace(mesh,pt(-.48f,1.34f,-.15f),pt(-.40f,1.34f,-.15f),pt(-.34f,1.60f,-.15f),pt(-.42f,1.60f,-.15f),{.42f,.23f,.09f});addFace(mesh,p0,p3,pt(-.32f,1.60f,-.14f),pt(-.40f,.75f,-.14f),{.78f,.77f,.70f});
+        }
+        for(const auto&a:skeletonArrows){V3 tip{a.x+a.vx*.035f,a.y+a.vy*.035f,a.z+a.vz*.035f},tail{a.x-a.vx*.035f,a.y-a.vy*.035f,a.z-a.vz*.035f};addFace(mesh,{tail.x-.018f,tail.y-.018f,tail.z},{tip.x-.018f,tip.y-.018f,tip.z},{tip.x+.018f,tip.y+.018f,tip.z},{tail.x+.018f,tail.y+.018f,tail.z},{.42f,.28f,.14f});}
+        draw(mesh,GL_TRIANGLES,vp,px,feet+1.62f,pz,false,false);
+    }
     void frame(float dt){
         fpsAccumulator+=dt;fpsFrames++;if(fpsAccumulator>=0.5f){fpsValue=fpsFrames/fpsAccumulator;fpsFrames=0;fpsAccumulator=0;}
         if(!running||!eglMakeCurrent(display,surface,surface,context))return;dt=std::min(dt,.04f);swordCooldown=std::max(0.0f,swordCooldown-dt);
         if(!inWorld){glViewport(0,0,width,height);glClearColor(.10f,.18f,.25f,1);glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);if(settingsOpen)drawSettings();else drawMenu();eglSwapBuffers(display,surface);return;}
-        if(playerDead){swallowTimer+=dt;if(swallowTimer>2.8f){playerDead=false;swallowTimer=0;health=10;armor=10;px=0;pz=0;feet=(float)groundHeight(0,0);vy=0;grounded=true;grafikX=6;grafikZ=-5;grafikFeet=(float)groundHeight(6,-5);grafikAlive=true;grafikHealth=6;grafikHitTimer=0;khalilHealth=8;khalilAlive=true;khalilHitTimer=0;deathMessage="GRAFIK ATE YOU";} }
+        if(playerDead){swallowTimer+=dt;if(swallowTimer>2.8f){playerDead=false;swallowTimer=0;health=10;armor=10;px=0;pz=0;feet=(float)groundHeight(0,0);vy=0;grounded=true;grafikX=6;grafikZ=-5;grafikFeet=(float)groundHeight(6,-5);skeletonX=px+8.0f;skeletonZ=pz+5.0f;skeletonFeet=(float)groundHeight((int)skeletonX,(int)skeletonZ);skeletonAlive=true;skeletonHealth=8;skeletonShootTimer=1.2f;skeletonArrows.clear();grafikAlive=true;grafikHealth=6;grafikHitTimer=0;khalilHealth=8;khalilAlive=true;khalilHitTimer=0;deathMessage="GRAFIK ATE YOU";} }
         dayClock=std::fmod(dayClock+dt,1200.0f);animationTime+=dt;updateSky();
         if(!playerDead){
         float forward=joyY,side=joyX,mag=std::sqrt(forward*forward+side*side);if(mag>1){forward/=mag;side/=mag;}
@@ -405,6 +435,7 @@
         }
         updateGrafik(dt);
         updateKhalil(dt);
+        updateSkeleton(dt);
         updateTnt(dt);
         updateWaterSimulation(dt);
         updateWorldEffects(dt);
@@ -467,6 +498,8 @@
         }
         drawHeldSword(vp);
         drawHeldPickaxe(vp);
+        drawHeldWoodAxe(vp);
+        drawSkeleton(vp);
         if(settingsOpen)drawSettings();else if(inventoryOpen)drawInventory();else drawHud();
         int gameMinutes=(int)(dayClock/1200.0f*1440.0f)%1440;
         std::string clockText=(gameMinutes/60<10?"0":"")+std::to_string(gameMinutes/60)+":"+(gameMinutes%60<10?"0":"")+std::to_string(gameMinutes%60);

@@ -26,6 +26,7 @@
     }
     void drawBlockIcon(uint8_t id,float x,float y,float w,float h){
         std::vector<float> icon;V3 white{1,1,1};
+        if(id==15||id==16){float cx=x+w*.5f;addTri(icon,{cx-w*.06f,y+h*.05f,0},{cx+w*.06f,y+h*.05f,0},{cx+w*.045f,y+h*.67f,0},{.48f,.28f,.12f});addTri(icon,{cx-w*.06f,y+h*.05f,0},{cx+w*.045f,y+h*.67f,0},{cx-w*.045f,y+h*.67f,0},{.60f,.36f,.16f});if(id==15){addTri(icon,{cx-w*.02f,y+h*.68f,0},{x+w*.14f,y+h*.96f,0},{x+w*.48f,y+h*.78f,0},{.57f,.34f,.14f});addTri(icon,{cx-w*.02f,y+h*.68f,0},{x+w*.48f,y+h*.78f,0},{x+w*.84f,y+h*.96f,0},{.57f,.34f,.14f});}else{addTri(icon,{x+w*.12f,y+h*.68f,0},{x+w*.88f,y+h*.68f,0},{x+w*.78f,y+h*.84f,0},{.62f,.39f,.17f});addTri(icon,{x+w*.12f,y+h*.68f,0},{x+w*.78f,y+h*.84f,0},{x+w*.22f,y+h*.84f,0},{.72f,.48f,.22f});}draw(icon,GL_TRIANGLES,identity(),0,0,0,false,false,0,false);return;}
         if(id==12){
             float cx=x+w*.5f,hy=y+h*.63f;
             addTri(icon,{cx-w*.055f,y+h*.04f,0},{cx+w*.055f,y+h*.04f,0},{cx+w*.04f,hy,0},{.42f,.23f,.09f});
@@ -45,8 +46,8 @@
             addTri(icon,{cx-w*.07f,y+h*.18f,0},{cx+w*.06f,y+h*.02f,0},{cx-w*.06f,y+h*.02f,0},{.48f,.28f,.12f});
             draw(icon,GL_TRIANGLES,identity(),0,0,0,false,false,0,false);return;
         }
-        int tile=id==10?5:(id==9?4:(id==3?2:(id==5?3:((id==1)?0:1))));
-        float u0=(tile+.035f)/7.0f,u1=(tile+.965f)/7.0f,v0=.035f,v1=.965f;
+        int tile=id==10?5:(id==9?4:(id==3?2:(id==5?3:(id==4?7:(id==13?8:(id==14?9:(id==8?10:(id==7?11:(id==17?8:((id==1)?0:1))))))))));
+        float u0=(tile+.035f)/12.0f,u1=(tile+.965f)/12.0f,v0=.035f,v1=.965f;
         addTri(icon,{x,y,0},{x+w,y,0},{x+w,y+h,0},white,u0,v0,u1,v0,u1,v1);
         addTri(icon,{x,y,0},{x+w,y+h,0},{x,y+h,0},white,u0,v0,u1,v1,u0,v1);
         draw(icon,GL_TRIANGLES,identity(),0,0,0,false,true,0,false);
@@ -103,7 +104,7 @@
         r(-.78f,-.73f,1.56f,1.43f,{.03f,.03f,.04f});r(-.75f,-.70f,1.50f,1.37f,{.13f,.14f,.16f});
         for(int i=0;i<20;i++){int row=i/5,col=i%5;float x=-.58f+col*.235f,y=.30f-row*.245f;r(x,y-.19f,.19f,.21f,i==selected?V3{.72f,.52f,.14f}:V3{.025f,.025f,.03f});r(x+.008f,y-.182f,.174f,.194f,{.24f,.24f,.26f});if(inventory[i].count&&i!=dragIndex){r(x+.055f,y-.135f,.075f,.09f,blockColor(inventory[i].id,2));drawText(inventory[i].count>=999999?"INF":std::to_string(inventory[i].count),x+.125f,y-.17f,.008f,{1,1,1});}}
         r(.60f,.27f,.15f,.15f,{.02f,.02f,.025f});r(.60f,-.02f,.15f,.15f,{.02f,.02f,.025f});r(.60f,-.31f,.15f,.15f,{.02f,.02f,.025f});draw(v,GL_TRIANGLES,identity(),0,0,0,false);for(int i=0;i<20;i++)if(inventory[i].count&&i!=dragIndex){int row=i/5,col=i%5;float x=-.58f+col*.235f,y=.30f-row*.245f;drawBlockIcon(inventory[i].id,x+.055f,y-.135f,.075f,.09f);}if(dragIndex>=0&&inventory[dragIndex].count)drawBlockIcon(inventory[dragIndex].id,dragX-.035f,dragY-.035f,.075f,.09f);
-        drawText("INVENTORY",-.25f,.62f,.025f,{1,.85f,.35f});drawText("DRAG TO MOVE - OUTSIDE TO DROP",-.52f,-.66f,.012f,{1,1,1});drawText("PLANKS",.57f,.48f,.015f,{1,1,1});drawText("STICKS",.58f,.19f,.015f,{1,1,1});drawText("TABLE",.59f,-.10f,.015f,{1,1,1});drawText("X",.66f,.62f,.025f,{1,1,1});glEnable(GL_DEPTH_TEST);
+        drawText(craftingTableOpen?"CRAFTING TABLE":"INVENTORY",-.25f,.62f,.025f,{1,.85f,.35f});drawText("DRAG TO MOVE - OUTSIDE TO DROP",-.52f,-.66f,.012f,{1,1,1});drawText(craftingTableOpen?"WOOD AXE":"PLANKS",.57f,.48f,.015f,{1,1,1});drawText(craftingTableOpen?"WOOD PICK":"STICKS",.58f,.19f,.015f,{1,1,1});drawText(craftingTableOpen?"IRON BLOCK":"TABLE",.59f,-.10f,.015f,{1,1,1});drawText("X",.66f,.62f,.025f,{1,1,1});glEnable(GL_DEPTH_TEST);
     }
     std::array<uint8_t,7> glyph(char c){
         switch(c){

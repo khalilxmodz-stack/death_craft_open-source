@@ -49,16 +49,16 @@
 
     bool loadTextures(AAssetManager* manager){
         if(!manager)return false;
-        constexpr int tile=256, atlasW=tile*7;
+        constexpr int tile=256, atlasTiles=12, atlasW=tile*atlasTiles;
         std::vector<unsigned char> atlas((size_t)atlasW*tile*4,255);
-        const char* names[]={"textures/grass_texture.png","textures/dirt_texture.png","textures/stone_texture.png","textures/grass_tree_texture.png","textures/water_texture.png","textures/tnt.png","textures/sword.png"};
-        const unsigned char fallback[7][4]={{78,156,55,255},{126,79,43,255},{116,122,130,255},{49,126,48,255},{28,112,190,210},{255,255,255,255},{255,255,255,255}};
-        for(int layer=0;layer<7;layer++)for(int y=0;y<tile;y++)for(int x=0;x<tile;x++){
+        const char* names[]={"textures/grass_texture.png","textures/dirt_texture.png","textures/stone_texture.png","textures/grass_tree_texture.png","textures/water_texture.png","textures/tnt.png","textures/sword.png","textures/wood_tree_texture.png","textures/iron_texture.png","textures/iron_block_texture.png","textures/crafting_table_texture.png","textures/stick_texture.png"};
+        const unsigned char fallback[atlasTiles][4]={{78,156,55,255},{126,79,43,255},{116,122,130,255},{49,126,48,255},{28,112,190,210},{255,255,255,255},{255,255,255,255},{104,66,34,255},{115,105,95,255},{180,185,190,255},{125,83,45,255},{160,112,55,255}};
+        for(int layer=0;layer<atlasTiles;layer++)for(int y=0;y<tile;y++)for(int x=0;x<tile;x++){
             size_t dst=((size_t)y*atlasW+(size_t)layer*tile+x)*4;
             std::copy(fallback[layer],fallback[layer]+4,atlas.begin()+dst);
         }
         int loaded=0;stbi_set_flip_vertically_on_load(1);
-        for(int layer=0;layer<7;layer++){
+        for(int layer=0;layer<atlasTiles;layer++){
             AAsset* asset=AAssetManager_open(manager,names[layer],AASSET_MODE_BUFFER);
             if(!asset){LOGE("Texture asset missing: %s",names[layer]);continue;}
             off_t length=AAsset_getLength(asset);std::vector<unsigned char> encoded((size_t)length);
@@ -105,5 +105,5 @@
         glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_NEAREST);glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_NEAREST);
         glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_S,GL_CLAMP_TO_EDGE);glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_T,GL_CLAMP_TO_EDGE);glGenerateMipmap(GL_TEXTURE_2D);
         loadKhalilTexture(manager);applyGraphicsFiltering();
-        LOGE("Loaded block and sword textures: %d/7",loaded);return loaded>0;
+        LOGE("Loaded block and item textures: %d/%d",loaded,atlasTiles);return loaded>0;
     }

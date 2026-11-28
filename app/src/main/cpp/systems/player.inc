@@ -47,7 +47,7 @@
     void editBlock(bool place){
         int x,y,z,ax,ay,az;if(!raycast(x,y,z,ax,ay,az)){status="No block in reach";statusFrames=90;return;}
         if(place){
-            if(selectedBlock()==11||selectedBlock()==12){status=selectedBlock()==11?"SWORD CANNOT BE PLACED":"PICKAXE CANNOT BE PLACED";statusFrames=70;return;}
+            if(selectedBlock()==11||selectedBlock()==12||selectedBlock()==15||selectedBlock()==16||selectedBlock()==17){status="TOOLS AND ITEMS CANNOT BE PLACED";statusFrames=70;return;}
             if(!inventory[selected].count){status="Select a block";statusFrames=90;return;}uint8_t item=selectedBlock();if(ay<0||ay>=HEIGHT)return;
             if(overlaps(ax+.5f,ay,az+.5f)){status="Cannot place inside player";statusFrames=90;return;}
             int cx=floorDiv(ax,CS),cz=floorDiv(az,CS);Chunk&c=ensureChunk(cx,cz);c.set(modp(ax,CS),ay,modp(az,CS),item);edits[{ax,ay,az}]=item;consumeSelected();
@@ -55,7 +55,7 @@
         }else{
             uint8_t broken=0;auto it=chunks.find(chunkKey(floorDiv(x,CS),floorDiv(z,CS)));if(it!=chunks.end())broken=it->second.get(modp(x,CS),y,modp(z,CS));
             int cx=floorDiv(x,CS),cz=floorDiv(z,CS);Chunk&c=ensureChunk(cx,cz);c.set(modp(x,CS),y,modp(z,CS),0);edits[{x,y,z}]=0;waterFlowDepth.erase({x,y,z});
-            uint8_t dropId=broken==4?4:(broken==5?5:(broken==3?3:((broken==1||broken==2)?2:(broken==6?6:broken))));
+            uint8_t dropId=broken==4?4:(broken==5?5:(broken==13?17:(broken==3?3:((broken==1||broken==2)?2:(broken==6?6:broken)))));
             if(dropId)spawnBlockEffects(x,y,z,dropId);
             if(lanMode){LanPacket packet{};packet.type=3;packet.player=networkId;packet.bx=x;packet.by=y;packet.bz=z;packet.block=0;sendLan(packet);}
         }
@@ -64,8 +64,9 @@
         status=place?"Block placed":"Block broken";statusFrames=60;
     }
     void useTarget(){
-        if(inventory[selected].count>0&&inventory[selected].id==11){attackMonster();return;}if(inventory[selected].count>0&&inventory[selected].id==12){status="PICKAXE EQUIPPED";statusFrames=45;return;}
+        if(inventory[selected].count>0&&inventory[selected].id==11){attackMonster();return;}if(inventory[selected].count>0&&(inventory[selected].id==12||inventory[selected].id==15||inventory[selected].id==16)){status="TOOL EQUIPPED";statusFrames=45;return;}
         int x,y,z,ax,ay,az;
+        if(raycast(x,y,z,ax,ay,az)&&blockAt(x,y,z)==8){inventoryOpen=true;craftingTableOpen=true;dragIndex=-1;status="CRAFTING TABLE OPEN";statusFrames=70;return;}
         if(raycast(x,y,z,ax,ay,az)&&blockAt(x,y,z)==10){
             auto it=chunks.find(chunkKey(floorDiv(x,CS),floorDiv(z,CS)));
             if(it!=chunks.end())it->second.set(modp(x,CS),y,modp(z,CS),0);
@@ -81,6 +82,7 @@
     void attackMonster(){
         if(playerDead||swordCooldown>0)return;
         bool swordEquipped=inventory[selected].count>0&&inventory[selected].id==11;
+        float skx=skeletonX-px,skz=skeletonZ-pz,skDist=std::sqrt(skx*skx+skz*skz);float fx0=std::sin(yaw),fz0=-std::cos(yaw);float skFacing=skDist>.001f?(skx*fx0+skz*fz0)/skDist:1.0f;if(skeletonAlive&&skDist<=3.6f&&skFacing>.30f){skeletonHealth=std::max(0,skeletonHealth-(swordEquipped?3:1));skeletonHitTimer=.28f;if(skeletonHealth<=0){skeletonAlive=false;skeletonRespawn=0;}swordCooldown=swordEquipped?.34f:.55f;status=skeletonHealth<=0?"SKELETON DEFEATED":"SKELETON HIT";statusFrames=80;return;}
         int damage=swordEquipped?3:1;
         float fx=std::sin(yaw),fz=-std::cos(yaw);
         float gdX=grafikX-px,gdZ=grafikZ-pz,gDist=std::sqrt(gdX*gdX+gdZ*gdZ);

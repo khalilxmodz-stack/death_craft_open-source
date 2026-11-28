@@ -43,15 +43,15 @@
             inventory[6]=creativeMode?Item{7,999999}:Item{7,0};inventory[7]=creativeMode?Item{8,999999}:Item{8,0};inventory[8]=creativeMode?Item{5,999999}:Item{5,8};inventory[9]=creativeMode?Item{11,999999}:Item{11,1};inventory[10]=creativeMode?Item{12,999999}:Item{12,1};
         }
         if(creativeMode)for(auto&i:inventory)if(i.id)i.count=999999;
-        grafikX=6;grafikZ=-5;grafikFeet=(float)groundHeight(6,-5);khalilX=px+9.0f;khalilZ=pz+4.0f;khalilFeet=(float)groundHeight((int)khalilX,(int)khalilZ);khalilAlive=true;khalilHealth=8;khalilHitTimer=0;khalilPrimed=false;khalilFuse=0;khalilRespawn=0;explosionEffectTimer=0;deathMessage="GRAFIK ATE YOU";selected=0;inWorld=true;saveTimer=0;updateWorld();status=loaded?"WORLD LOADED":"WORLD CREATED";statusFrames=120;
+        grafikX=6;grafikZ=-5;grafikFeet=(float)groundHeight(6,-5);skeletonX=px+8.0f;skeletonZ=pz+5.0f;skeletonFeet=(float)groundHeight((int)skeletonX,(int)skeletonZ);skeletonYaw=0;skeletonShootTimer=1.4f;skeletonHealth=8;skeletonAlive=true;skeletonHitTimer=0;skeletonRespawn=0;skeletonArrows.clear();khalilX=px+9.0f;khalilZ=pz+4.0f;khalilFeet=(float)groundHeight((int)khalilX,(int)khalilZ);khalilAlive=true;khalilHealth=8;khalilHitTimer=0;khalilPrimed=false;khalilFuse=0;khalilRespawn=0;explosionEffectTimer=0;deathMessage="GRAFIK ATE YOU";selected=0;inWorld=true;saveTimer=0;updateWorld();status=loaded?"WORLD LOADED":"WORLD CREATED";statusFrames=120;
     }
     uint8_t blockAt(int x,int y,int z)const{
         int cx=floorDiv(x,CS),cz=floorDiv(z,CS);auto it=chunks.find(chunkKey(cx,cz));
         return it==chunks.end()?0:it->second.get(modp(x,CS),y,modp(z,CS));
     }
     void addBlockFace(std::vector<float>&v,V3 a,V3 b,V3 c,V3 d,uint8_t block,int face,int gx,int gy,int gz){
-        int tile=block==11?6:(block==10?5:(block==9?4:(block==3?2:(block==5?3:((block==1&&face==2)?0:1)))));
-        float u0=(tile+.012f)/7.0f,u1=(tile+.988f)/7.0f,v0=.012f,v1=.988f;
+        int tile=block==11?6:(block==10?5:(block==9?4:(block==3?2:(block==5?3:(block==4?7:(block==13?8:(block==14?9:(block==8?10:((block==1&&face==2)?0:1)))))))));
+        float u0=(tile+.012f)/12.0f,u1=(tile+.988f)/12.0f,v0=.012f,v1=.988f;
         const float shade[6]={.72f,.84f,1.0f,.38f,.62f,.78f};float light=shade[face];
         if(block==1&&face==2){
             bool underTree=false;
@@ -59,7 +59,7 @@
                 for(int dy=2;dy<=5;dy++)if(blockAt(gx+dx,gy+dy,gz+dz)==5){underTree=true;break;}
             if(underTree)light*=.52f;
         }
-        V3 color=block==10?V3{1,1,1}:(block==9?V3{.22f*light,.52f*light,.88f*light}:V3{light,light,light});
+        V3 color=(block==10||block==13||block==14||block==8)?V3{1,1,1}:(block==9?V3{.22f*light,.52f*light,.88f*light}:V3{light,light,light});
         addTri(v,a,b,c,color,u0,v0,u1,v0,u1,v1);addTri(v,a,c,d,color,u0,v0,u1,v1,u0,v1);
     }
     bool solid(int x,int y,int z){
@@ -78,7 +78,7 @@
                     float chamber=terrainNoise((wx-y*.48f)*.105f-73.0f,(wz+y*.62f)*.105f+47.0f);
                     cave=tunnel>.69f&&chamber>.48f;
                 }
-                if(!cave)c.set(x,y,z,y==h-1?1:(y>=h-4?2:3));
+                if(!cave){uint8_t block=y==h-1?1:(y>=h-4?2:3);if(block==3&&y>2&&y<h-5&&terrainHash(wx*17+y*31,wz*13-y*7)%173u==0u)block=13;c.set(x,y,z,block);}
             }
             if(h<SEA_LEVEL)for(int y=h;y<SEA_LEVEL;y++)c.set(x,y,z,9);
         }
@@ -133,6 +133,6 @@
     V3 blockColor(uint8_t b,int face){
         if(b==9)return{.12f,.42f,.82f};if(b==1){if(face==2)return{.22f,.68f,.18f};return{.42f,.29f,.16f};}
         if(b==2)return{.48f,.31f,.17f};if(b==3)return{.43f,.45f,.48f};
-        if(b==4)return{.43f,.27f,.12f};if(b==5)return{.12f,.48f,.13f};if(b==6)return{.67f,.46f,.24f};if(b==10||b==11)return{1,1,1};return{.72f,.62f,.35f};
+        if(b==4)return{.43f,.27f,.12f};if(b==5)return{.12f,.48f,.13f};if(b==6)return{.67f,.46f,.24f};if(b==13)return{.72f,.68f,.62f};if(b==14)return{.78f,.80f,.83f};if(b==8)return{.70f,.48f,.25f};if(b==10||b==11)return{1,1,1};return{.72f,.62f,.35f};
     }
-    float breakDuration(uint8_t b)const{bool pickaxe=selected>=0&&selected<(int)inventory.size()&&inventory[selected].count>0&&inventory[selected].id==12;if(pickaxe&&b==3)return .24f;if(pickaxe&&b==2)return .42f;switch(b){case 1:return .65f;case 2:return .90f;case 3:return 2.10f;case 4:return 1.25f;case 5:return .30f;case 6:return 1.10f;case 10:return .25f;case 11:return .25f;default:return .85f;}}
+    float breakDuration(uint8_t b)const{uint8_t tool=selected>=0&&selected<(int)inventory.size()&&inventory[selected].count>0?inventory[selected].id:0;bool ironPick=tool==12,woodPick=tool==16,axe=tool==15;if((ironPick||woodPick)&&b==3)return ironPick?.24f:.95f;if(ironPick&&b==13)return .38f;if(axe&&b==4)return .28f;if((ironPick||woodPick)&&b==2)return ironPick?.30f:.70f;switch(b){case 1:return .65f;case 2:return .90f;case 3:return 2.10f;case 4:return 1.25f;case 5:return .30f;case 6:return 1.10f;case 8:return .90f;case 10:return .25f;case 11:return .25f;case 13:return 2.8f;case 14:return 3.0f;default:return .85f;}}
