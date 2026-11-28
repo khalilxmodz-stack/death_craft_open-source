@@ -6,14 +6,14 @@
         void main(){vec3 pos=p;if(waterAnimation>.5&&uvIn.x>.80){pos.y+=sin(animTime*1.15+p.x*.72+p.z*.61)*.035;}gl_Position=mvp*vec4(pos,1.0);color=c;texCoord=uvIn;fogDistance=length(pos-cameraPos);})";
         const char*fs=R"(#version 300 es
         precision highp float; in vec3 color; in float fogDistance; in vec2 texCoord; uniform float fogEnabled; uniform float textured; uniform sampler2D blockAtlas; uniform vec3 skyColor; uniform float fogStart; uniform float fogEnd; out vec4 outColor;
-        void main(){vec3 base=color;if(textured>.5)base*=texture(blockAtlas,texCoord).rgb;base=pow(max(base,vec3(0.0)),vec3(0.92));base=clamp((base-vec3(0.5))*1.10+vec3(0.5),0.0,1.0);float fog=fogEnabled*smoothstep(fogStart,fogEnd,fogDistance);outColor=vec4(mix(base,skyColor,fog),1.0);})";
+        void main(){vec4 texel=vec4(1.0);if(textured>.5)texel=texture(blockAtlas,texCoord);vec3 base=color*texel.rgb;base=pow(max(base,vec3(0.0)),vec3(0.96));base=clamp((base-vec3(0.5))*1.06+vec3(0.5),0.0,1.0);float fog=fogEnabled*smoothstep(fogStart,fogEnd,fogDistance);outColor=vec4(mix(base,skyColor,fog),textured>.5?texel.a:1.0);})";
         GLuint a=makeShader(GL_VERTEX_SHADER,vs),b=makeShader(GL_FRAGMENT_SHADER,fs);
         program=glCreateProgram();glAttachShader(program,a);glAttachShader(program,b);glLinkProgram(program);glDeleteShader(a);glDeleteShader(b);
         GLint ok=0;glGetProgramiv(program,GL_LINK_STATUS,&ok);if(!ok)return false;
         mvpLoc=glGetUniformLocation(program,"mvp");cameraLoc=glGetUniformLocation(program,"cameraPos");fogLoc=glGetUniformLocation(program,"fogEnabled");textureLoc=glGetUniformLocation(program,"textured");atlasLoc=glGetUniformLocation(program,"blockAtlas");skyColorLoc=glGetUniformLocation(program,"skyColor");animTimeLoc=glGetUniformLocation(program,"animTime");waterAnimationLoc=glGetUniformLocation(program,"waterAnimation");fogStartLoc=glGetUniformLocation(program,"fogStart");fogEndLoc=glGetUniformLocation(program,"fogEnd");
         glUseProgram(program);glUniform1i(atlasLoc,0);
         glGenVertexArrays(1,&vao);glGenBuffers(1,&vbo);
-        glEnable(GL_DEPTH_TEST);glDisable(GL_CULL_FACE);return true;
+        glEnable(GL_DEPTH_TEST);glEnable(GL_BLEND);glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);glDisable(GL_CULL_FACE);return true;
     }
     void addTri(std::vector<float>&v,V3 a,V3 b,V3 c,V3 color,float au=0,float av=0,float bu=1,float bv=0,float cu=1,float cv=1){
         v.insert(v.end(),{a.x,a.y,a.z,color.x,color.y,color.z,au,av,b.x,b.y,b.z,color.x,color.y,color.z,bu,bv,c.x,c.y,c.z,color.x,color.y,color.z,cu,cv});
