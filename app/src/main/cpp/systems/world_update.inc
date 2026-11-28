@@ -95,6 +95,106 @@
             blockParticles.push_back(p);
         }
     }
+    void updateWaterSimulation(float dt){
+        if(lanMode==2)return; // LAN clients display the host's authoritative fluid updates.
+        waterSimulationTimer+=dt;
+        if(waterSimulationTimer<.24f)return;
+        waterSimulationTimer=0.0f;
+        const int centerX=(int)std::floor(px),centerZ=(int)std::floor(pz);
+        std::vector<std::tuple<int,int,int>> cells;
+        for(const auto& entry:chunks){
+            const Chunk& chunk=entry.second;
+            int ox=chunk.cx*CS,oz=chunk.cz*CS;
+            if(std::abs(ox+CS/2-centerX)>11||std::abs(oz+CS/2-centerZ)>11)continue;
+            for(int y=0;y<HEIGHT;y++)for(int z=0;z<CS;z++)for(int x=0;x<CS;x++){
+                if(chunk.get(x,y,z)!=9)continue;
+                int wx=ox+x,wz=oz+z;
+                if(std::abs(wx-centerX)<=10&&std::abs(wz-centerZ)<=10){
+                    cells.emplace_back(wx,y,wz);
+                    if(cells.size()>=180)break;
+                }
+            }
+            if(cells.size()>=180)break;
+        }
+        int flowed=0;
+        auto flowTo=[&](int x,int y,int z,uint8_t depth){
+            if(flowed>=20||y<0||y>=HEIGHT||blockAt(x,y,z)!=0)return;
+            Chunk& target=ensureChunk(floorDiv(x,CS),floorDiv(z,CS));
+            target.set(modp(x,CS),y,modp(z,CS),9);
+            edits[{x,y,z}]=9;waterFlowDepth[{x,y,z}]=depth;
+            for(auto& entry:chunks)entry.second.dirty=true;
+            if(lanMode==1){LanPacket packet{};packet.type=3;packet.player=networkId;packet.bx=x;packet.by=y;packet.bz=z;packet.block=9;sendLan(packet);}
+            flowed++;
+        };
+        static const int dirs[4][2]={{1,0},{-1,0},{0,1},{0,-1}};
+        for(const auto& cell:cells){
+            if(flowed>=20)break;
+            int x=std::get<0>(cell),y=std::get<1>(cell),z=std::get<2>(cell);
+            uint8_t depth=0;auto d=waterFlowDepth.find(cell);if(d!=waterFlowDepth.end())depth=d->second;
+            // Gravity wins: a falling stream keeps descending before spreading sideways.
+            if(y>0&&blockAt(x,y-1,z)==0){flowTo(x,y-1,z,0);continue;}
+            if(depth>=5)continue;
+            // On landing, or when a block is removed beside it, water fans outward.
+            for(const auto& dir:dirs){
+                int nx=x+dir[0],nz=z+dir[1];
+                if(blockAt(nx,y,nz)!=0)continue;
+                if(y>0&&blockAt(nx,y-1,nz)==0)continue;
+                flowTo(nx,y,nz,(uint8_t)(depth+1));
+                if(flowed>=20)break;
+            }
+        }
+        if(waterFlowDepth.size()>6000){
+            for(auto it=waterFlowDepth.begin();it!=waterFlowDepth.end();){
+                int x=std::get<0>(it->first),z=std::get<2>(it->first);
+                if(std::abs(x-centerX)>24||std::abs(z-centerZ)>24)it=waterFlowDepth.erase(it);else ++it;
+            }
+        }
+    }
+    void drawHeldSword(const Mat4&vp){
+        if(selected<0||selected>=(int)inventory.size()||inventory[selected].count<=0||inventory[selected].id!=11)return;
+        V3 right{std::cos(yaw),0,std::sin(yaw)};
+        V3 up{-std::sin(yaw)*std::sin(pitch),std::cos(pitch),std::cos(yaw)*std::sin(pitch)};
+        V3 forward{std::sin(yaw)*std::cos(pitch),std::sin(pitch),-std::cos(yaw)*std::cos(pitch)};
+        V3 origin{px+forward.x*.72f+right.x*.34f-up.x*.34f,
+                  feet+1.62f+forward.y*.72f+right.y*.34f-up.y*.34f,
+                  pz+forward.z*.72f+right.z*.34f-up.z*.34f};
+        float swing=swordCooldown>0?std::sin((.34f-swordCooldown)/.34f*PI)*.62f:0.0f;
+        auto point=[&](float x,float y,float z){
+            float rx=x*std::cos(swing)-y*std::sin(swing);
+            float ry=x*std::sin(swing)+y*std::cos(swing);
+            return V3{origin.x+right.x*rx+up.x*ry+forward.x*z,
+                      origin.y+right.y*rx+up.y*ry+forward.y*z,
+                      origin.z+right.z*rx+up.z*ry+forward.z*z};
+        };
+        std::vector<float> mesh;
+        auto quad=[&](V3 a,V3 b,V3 c,V3 d,V3 color){addFace(mesh,point(a.x,a.y,a.z),point(b.x,b.y,b.z),point(c.x,c.y,c.z),point(d.x,d.y,d.z),color);};
+        auto box=[&](float x0,float y0,float z0,float x1,float y1,float z1,V3 color){
+            V3 a{x0,y0,z0},b{x1,y0,z0},c{x1,y1,z0},d{x0,y1,z0};
+            V3 e{x0,y0,z1},f{x1,y0,z1},g{x1,y1,z1},h{x0,y1,z1};
+            quad(a,b,c,d,color);quad(f,e,h,g,{color.x*.68f,color.y*.68f,color.z*.72f});
+            quad(e,a,d,h,{color.x*.78f,color.y*.78f,color.z*.82f});quad(b,f,g,c,{color.x*.82f,color.y*.82f,color.z*.86f});
+            quad(d,c,g,h,{std::min(1.0f,color.x*1.12f),std::min(1.0f,color.y*1.12f),std::min(1.0f,color.z*1.12f)});quad(e,f,b,a,{color.x*.58f,color.y*.58f,color.z*.62f});
+        };
+        // Polished, tapered steel blade with a bright central ridge.
+        V3 bl=point(-.105f,.10f,-.035f),br=point(.105f,.10f,-.035f),mr=point(.073f,.69f,-.035f),tip=point(0,.94f,-.035f),ml=point(-.073f,.69f,-.035f);
+        V3 ridge=point(0,.10f,-.052f),ridgeTop=point(0,.79f,-.052f);
+        addTri(mesh,bl,ridge,ridgeTop,{.94f,.96f,1.0f});addTri(mesh,ridge,br,mr,{.82f,.86f,.92f});
+        addTri(mesh,ridge,mr,tip,{.93f,.95f,.98f});addTri(mesh,ml,ridgeTop,tip,{.76f,.81f,.88f});
+        V3 bbl=point(-.105f,.10f,.035f),bbr=point(.105f,.10f,.035f),bmr=point(.073f,.69f,.035f),btip=point(0,.94f,.035f),bml=point(-.073f,.69f,.035f);
+        addTri(mesh,bbl,bmr,bbr,{.56f,.60f,.67f});addTri(mesh,bbl,bml,bmr,{.66f,.70f,.77f});addTri(mesh,bml,btip,bmr,{.58f,.63f,.71f});
+        quad({-.105f,.10f,-.035f},{-.105f,.10f,.035f},{-.073f,.69f,.035f},{-.073f,.69f,-.035f},{.72f,.76f,.84f});
+        quad({.105f,.10f,-.035f},{.073f,.69f,-.035f},{.073f,.69f,.035f},{.105f,.10f,.035f},{.48f,.53f,.61f});
+        quad({-.073f,.69f,-.035f},{0,.94f,-.035f},{0,.94f,.035f},{-.073f,.69f,.035f},{.78f,.82f,.90f});
+        quad({0,.94f,-.035f},{.073f,.69f,-.035f},{.073f,.69f,.035f},{0,.94f,.035f},{.54f,.59f,.67f});
+        // Steel crossguard, brown leather/wood grip, wrapped bands and pommel.
+        box(-.245f,.015f,-.075f,.245f,.095f,.075f,{.72f,.76f,.82f});
+        box(-.064f,-.285f,-.055f,.064f,.025f,.055f,{.34f,.18f,.075f});
+        box(-.067f,-.22f,-.060f,.067f,-.185f,.060f,{.20f,.105f,.045f});
+        box(-.067f,-.12f,-.060f,.067f,-.085f,.060f,{.22f,.115f,.05f});
+        box(-.09f,-.325f,-.075f,.09f,-.27f,.075f,{.48f,.29f,.12f});
+        box(-.055f,.035f,-.055f,.055f,.075f,.055f,{.88f,.90f,.94f});
+        glDisable(GL_DEPTH_TEST);draw(mesh,GL_TRIANGLES,vp,px,feet+1.62f,pz,false,false);glEnable(GL_DEPTH_TEST);
+    }
     void updateWorldEffects(float dt){
         for(auto it=droppedItems.begin();it!=droppedItems.end();){
             it->age+=dt;it->vy-=12.0f*dt;it->x+=it->vx*dt;it->y+=it->vy*dt;it->z+=it->vz*dt;
@@ -271,6 +371,7 @@
         updateGrafik(dt);
         updateKhalil(dt);
         updateTnt(dt);
+        updateWaterSimulation(dt);
         updateWorldEffects(dt);
         updateLan(dt);
         if(inWorld){saveTimer+=dt;if(saveTimer>=12.0f){saveWorld();saveTimer=0;}}
@@ -329,6 +430,7 @@
             for(int i=0;i<24;i+=2){for(int j:{e[i],e[i+1]})edge.insert(edge.end(),{p[j].x,p[j].y,p[j].z,white.x,white.y,white.z,0,0});}
             glDisable(GL_CULL_FACE);draw(edge,GL_LINES,vp,px,feet+1.62f,pz,true);
         }
+        drawHeldSword(vp);
         if(settingsOpen)drawSettings();else if(inventoryOpen)drawInventory();else drawHud();
         int gameMinutes=(int)(dayClock/1200.0f*1440.0f)%1440;
         std::string clockText=(gameMinutes/60<10?"0":"")+std::to_string(gameMinutes/60)+":"+(gameMinutes%60<10?"0":"")+std::to_string(gameMinutes%60);
