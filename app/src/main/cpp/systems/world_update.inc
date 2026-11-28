@@ -2,7 +2,7 @@
     // Function comments describe each method's responsibility and its place in the game systems.
 
     // Streams nearby chunks and schedules world simulation updates.
-    void updateWorld() {
+    ) {
         int cx = floorDiv((int)std::floor(px), CS), cz = floorDiv((int)std::floor(pz), CS);
         // Stream a few nearby chunks per frame; keep generation out of a single long frame.
         int generationBudget = 4;
@@ -35,11 +35,11 @@
         }
     }
     // Reports whether the current world clock is in its night period.
-    bool isNight() const {
+    ) const {
         return std::sin(dayClock / 1200.0f * 2.0f * PI) < -.08f;
     }
     // Updates sky lighting and colors from the current time of day.
-    void updateSky() {
+    ) {
         float phase = dayClock / 1200.0f;
         float daylight = std::clamp(std::sin(phase * 2.0f * PI) * 2.4f + .15f, 0.0f, 1.0f);
         V3 night{.0015f, .002f, .006f}, day{.48f, .74f, .96f}, dawn{.92f, .34f, .16f};
@@ -54,7 +54,7 @@
                    skyTint.z + (dawn.z - skyTint.z) * dusk * .42f};
     }
     // Renders sky decorations such as the sun, moon, and stars.
-    void drawSkyDecor(const Mat4& vp) {
+    const Mat4& vp) {
         const float phase = dayClock / 1200.0f, angle = phase * 2.0f * PI;
         const float daylight = std::clamp(std::sin(angle) * 2.4f + .15f, 0.0f, 1.0f);
         const float sunHeight = std::sin(angle);
@@ -134,7 +134,7 @@
         glEnable(GL_DEPTH_TEST);
     }
     // Creates a world item entity at the supplied position.
-    void spawnDroppedItem(uint8_t id, float x, float y, float z, int count = 1) {
+    uint8_t id, float x, float y, float z, int count = 1) {
         if (!id)
             return;
         DroppedItem item{};
@@ -160,7 +160,7 @@
         }
     }
     // Creates the dropped item and particles for a broken block.
-    void spawnBlockEffects(int x, int y, int z, uint8_t id) {
+    int x, int y, int z, uint8_t id) {
         DroppedItem item{};
         item.id = id;
         item.x = x + .5f;
@@ -186,7 +186,7 @@
         }
     }
     // Advances water flow and updates affected block regions.
-    void updateWaterSimulation(float dt) {
+    float dt) {
         if (lanMode == 2)
             return;  // LAN clients display the host's authoritative fluid updates.
         waterSimulationTimer += dt;
@@ -275,7 +275,7 @@
         }
     }
     // Renders the sword held by the first-person player.
-    void drawHeldSword(const Mat4& vp) {
+    const Mat4& vp) {
         if (selected < 0 || selected >= (int)inventory.size() || inventory[selected].count <= 0 ||
             inventory[selected].id != 11)
             return;
@@ -367,7 +367,7 @@
         glEnable(GL_DEPTH_TEST);
     }
     // Renders the pickaxe held by the first-person player.
-    void drawHeldPickaxe(const Mat4& vp) {
+    const Mat4& vp) {
         if (selected < 0 || selected >= (int)inventory.size() || inventory[selected].count <= 0 ||
             (inventory[selected].id != 12 && inventory[selected].id != 16))
             return;
@@ -447,7 +447,7 @@
         glEnable(GL_DEPTH_TEST);
     }
     // Renders the wooden axe held by the first-person player.
-    void drawHeldWoodAxe(const Mat4& vp) {
+    const Mat4& vp) {
         if (selected < 0 || selected >= (int)inventory.size() || inventory[selected].count <= 0 ||
             inventory[selected].id != 15)
             return;
@@ -499,7 +499,7 @@
         glEnable(GL_DEPTH_TEST);
     }
     // Selects and renders the currently equipped first-person item.
-    void drawHeldItem(const Mat4& vp) {
+    const Mat4& vp) {
         if (selected < 0 || selected >= (int)inventory.size() || inventory[selected].count <= 0)
             return;
         uint8_t id = inventory[selected].id;
@@ -574,7 +574,7 @@
         glEnable(GL_DEPTH_TEST);
     }
     // Updates dropped items, particles, projectiles, and temporary effects.
-    void updateWorldEffects(float dt) {
+    float dt) {
         for (auto it = droppedItems.begin(); it != droppedItems.end();) {
             it->age += dt;
             it->vy -= 12.0f * dt;
@@ -632,7 +632,7 @@
         }
     }
     // Renders world-space item drops and block-break effects.
-    void drawWorldEffects(const Mat4& vp) {
+    const Mat4& vp) {
         std::vector<float> v;
         auto cube = [&](float x, float y, float z, float s, V3 color) {
             V3 a{x - s, y - s, z - s}, b{x + s, y - s, z - s}, c{x + s, y + s, z - s},
@@ -658,7 +658,7 @@
     }
 
     // Advances TNT fuses and processes explosions.
-    void updateTnt(float dt) {
+    float dt) {
         for (auto it = primedTnts.begin(); it != primedTnts.end();) {
             it->fuse -= dt;
             if (it->fuse > 0.0f) {
@@ -732,7 +732,7 @@
         }
     }
     // Updates the Khalil monster's movement, attacks, and network state.
-    void updateKhalil(float dt) {
+    float dt) {
         khalilHitTimer = std::max(0.0f, khalilHitTimer - dt);
         if (explosionEffectTimer > 0)
             explosionEffectTimer = std::max(0.0f, explosionEffectTimer - dt);
@@ -826,7 +826,7 @@
         }
     }
     // Renders the Khalil monster and its current visual state.
-    void drawKhalil(const Mat4& vp) {
+    const Mat4& vp) {
         if (khalilAlive) {
             std::vector<float> sphere;
             const int latitudes = 12, longitudes = 20;
@@ -888,7 +888,7 @@
         }
     }
     // Updates skeleton movement, attacks, and projectile behavior.
-    void updateSkeleton(float dt) {
+    float dt) {
         skeletonHitTimer = std::max(0.0f, skeletonHitTimer - dt);
         if (!isNight()) {
             skeletonAlive = false;
@@ -1008,7 +1008,7 @@
         }
     }
     // Renders the skeleton and its health or attack indicators.
-    void drawSkeleton(const Mat4& vp) {
+    const Mat4& vp) {
         if (!skeletonAlive && skeletonArrows.empty())
             return;
         std::vector<float> mesh;
@@ -1082,7 +1082,7 @@
         draw(mesh, GL_TRIANGLES, vp, px, feet + 1.62f, pz, false, false);
     }
     // Runs one game frame, including simulation, rendering, and HUD updates.
-    void frame(float dt) {
+    float dt) {
         fpsAccumulator += dt;
         fpsFrames++;
         if (fpsAccumulator >= 0.5f) {
