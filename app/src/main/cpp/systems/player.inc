@@ -47,6 +47,7 @@
     void editBlock(bool place){
         int x,y,z,ax,ay,az;if(!raycast(x,y,z,ax,ay,az)){status="No block in reach";statusFrames=90;return;}
         if(place){
+            if(selectedBlock()==11){status="SWORD CANNOT BE PLACED";statusFrames=70;return;}
             if(!inventory[selected].count){status="Select a block";statusFrames=90;return;}uint8_t item=selectedBlock();if(ay<0||ay>=HEIGHT)return;
             if(overlaps(ax+.5f,ay,az+.5f)){status="Cannot place inside player";statusFrames=90;return;}
             int cx=floorDiv(ax,CS),cz=floorDiv(az,CS);Chunk&c=ensureChunk(cx,cz);c.set(modp(ax,CS),ay,modp(az,CS),item);edits[{ax,ay,az}]=item;consumeSelected();
@@ -63,6 +64,7 @@
         status=place?"Block placed":"Block broken";statusFrames=60;
     }
     void useTarget(){
+        if(inventory[selected].count>0&&inventory[selected].id==11){attackMonster();return;}
         int x,y,z,ax,ay,az;
         if(raycast(x,y,z,ax,ay,az)&&blockAt(x,y,z)==10){
             auto it=chunks.find(chunkKey(floorDiv(x,CS),floorDiv(z,CS)));
@@ -76,18 +78,33 @@
         }
         attackGrafik();
     }
-    void attackGrafik(){
-        if(!grafikAlive||playerDead)return;
-        float dx=grafikX-px,dz=grafikZ-pz,dist=std::sqrt(dx*dx+dz*dz);
+    void attackMonster(){
+        if(playerDead)return;
         float fx=std::sin(yaw),fz=-std::cos(yaw);
+        float gdX=grafikX-px,gdZ=grafikZ-pz,gDist=std::sqrt(gdX*gdX+gdZ*gdZ);
+        float kdX=khalilX-px,kdZ=khalilZ-pz,kDist=std::sqrt(kdX*kdX+kdZ*kdZ);
+        bool hitGrafik=grafikAlive&&gDist<=3.6f&&gDist<=kDist;
+        bool hitKhalil=khalilAlive&&kDist<=3.6f&&!hitGrafik;
+        float dx=hitGrafik?gdX:kdX,dz=hitGrafik?gdZ:kdZ,dist=hitGrafik?gDist:kDist;
         float facing=dist>.001f?(dx*fx+dz*fz)/dist:1.0f;
-        if(dist<=3.4f&&facing>.35f){
-            grafikHealth--;status=grafikHealth<=0?"GRAFIK DEFEATED":"GRAFIK HIT";statusFrames=90;
+        if((!hitGrafik&&!hitKhalil)||facing<.30f){status="MONSTER OUT OF REACH";statusFrames=70;return;}
+        if(lanMode==2){
+            LanPacket hit{};hit.type=6;hit.player=networkId;hit.x=px;hit.y=feet;hit.z=pz;hit.yaw=yaw;hit.flags=hitGrafik?1:0;hit.block=3;sendLan(hit);
+            status="SWORD SWING";statusFrames=35;return;
+        }
+        if(hitGrafik){
+            grafikHealth=std::max(0,grafikHealth-3);grafikHitTimer=.28f;
+            status=grafikHealth<=0?"GRAFIK DEFEATED":"GRAFIK HIT";statusFrames=90;
             if(grafikHealth<=0){grafikAlive=false;grafikRespawn=0;}
-        }else{status="GRAFIK OUT OF REACH";statusFrames=70;}
+        }else{
+            khalilHealth=std::max(0,khalilHealth-3);khalilHitTimer=.28f;
+            status=khalilHealth<=0?"KHALIL DEFEATED":"KHALIL HIT";statusFrames=90;
+            if(khalilHealth<=0){khalilAlive=false;khalilRespawn=0;khalilPrimed=false;khalilFuse=0;}
+        }
     }
     void updateGrafik(float dt){
-        if(!grafikAlive){grafikRespawn+=dt;if(grafikRespawn>18.0f){grafikAlive=true;grafikHealth=2;grafikX=px+6.0f;grafikZ=pz-5.0f;grafikFeet=(float)groundHeight((int)std::floor(grafikX),(int)std::floor(grafikZ));}return;}
+        grafikHitTimer=std::max(0.0f,grafikHitTimer-dt);
+        if(!grafikAlive){grafikRespawn+=dt;if(grafikRespawn>18.0f){grafikAlive=true;grafikHealth=6;grafikHitTimer=0;grafikX=px+6.0f;grafikZ=pz-5.0f;grafikFeet=(float)groundHeight((int)std::floor(grafikX),(int)std::floor(grafikZ));}return;}
         if(playerDead||creativeMode)return;
         float dx=px-grafikX,dz=pz-grafikZ,dist=std::sqrt(dx*dx+dz*dz);
         if(dist<.82f){playerDead=true;swallowTimer=.001f;return;}
