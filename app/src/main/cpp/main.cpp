@@ -25,7 +25,7 @@
 #include "stb_image.h"
 
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR,"DeathCraft",__VA_ARGS__)
-static constexpr int CS=16, HEIGHT=32, LOAD_RADIUS=4;
+static constexpr int CS=16, HEIGHT=32, LOAD_RADIUS=5;
 static constexpr float PI=3.14159265f;
 static constexpr int SEA_LEVEL=6;
 
@@ -76,6 +76,7 @@ struct Chunk {
     int cx=0,cz=0;
     std::array<uint8_t,CS*CS*HEIGHT> blocks{};
     std::vector<float> mesh;
+    std::vector<float> shadowMesh;
     bool dirty=true;
     uint8_t get(int x,int y,int z)const{return (x<0||x>=CS||z<0||z>=CS||y<0||y>=HEIGHT)?0:blocks[(y*CS+z)*CS+x];}
     void set(int x,int y,int z,uint8_t b){if(x>=0&&x<CS&&z>=0&&z<CS&&y>=0&&y<HEIGHT){blocks[(y*CS+z)*CS+x]=b;dirty=true;}}
@@ -90,6 +91,8 @@ class Game {
     std::map<uint64_t,Chunk> chunks;
     std::map<std::tuple<int,int,int>,uint8_t> edits;
     float px=0,feet=1.0f,pz=0,yaw=0,pitch=0,vy=0;
+    float fallStartFeet=0;
+    bool fallTracking=false;
     bool grounded=false,running=false;
     float joyX=0,joyY=0,lastX=0,lastY=0,joyOriginX=-.76f,joyOriginY=-.65f;
     int joyId=-1,lookId=-1;
@@ -159,7 +162,7 @@ class Game {
         void main(){gl_Position=mvp*vec4(p,1.0);color=c;texCoord=uvIn;fogDistance=length(p-cameraPos);})";
         const char*fs=R"(#version 300 es
         precision highp float; in vec3 color; in float fogDistance; in vec2 texCoord; uniform float fogEnabled; uniform float textured; uniform sampler2D blockAtlas; out vec4 outColor;
-        void main(){vec3 base=color;if(textured>.5)base*=texture(blockAtlas,texCoord).rgb;vec3 sky=vec3(.48,.74,.96);float fog=fogEnabled*smoothstep(22.0,68.0,fogDistance);outColor=vec4(mix(base,sky,fog),1.0);})";
+        void main(){vec3 base=color;if(textured>.5)base*=texture(blockAtlas,texCoord).rgb;vec3 sky=vec3(.48,.74,.96);float fog=fogEnabled*smoothstep(78.0,126.0,fogDistance);outColor=vec4(mix(base,sky,fog),1.0);})";
         GLuint a=makeShader(GL_VERTEX_SHADER,vs),b=makeShader(GL_FRAGMENT_SHADER,fs);
         program=glCreateProgram();glAttachShader(program,a);glAttachShader(program,b);glLinkProgram(program);glDeleteShader(a);glDeleteShader(b);
         GLint ok=0;glGetProgramiv(program,GL_LINK_STATUS,&ok);if(!ok)return false;
@@ -325,7 +328,30 @@ class Game {
     void craft(int r){uint8_t src=r==0?4:6;int n=r==0?1:(r==1?2:4);for(auto&i:inventory)if(i.id==src&&n){int k=std::min(n,i.count);i.count-=k;n-=k;if(!i.count)i.id=0;}if(n){status=r==0?"Need wood":"Need planks";statusFrames=90;return;}addItem(r==0?6:(r==1?7:8),r==0?4:(r==1?4:1));}
     int inventorySlotAt(float x,float y)const{for(int r=0;r<4;r++)for(int c=0;c<5;c++){float bx=-.58f+c*.235f,by=.30f-r*.245f;if(x>=bx&&x<=bx+.19f&&y>=by-.19f&&y<=by+.02f)return r*5+c;}return -1;}
     void rebuild(Chunk&c){
-        c.mesh.clear();int ox=c.cx*CS,oz=c.cz*CS;
+        c.mesh.clear();c.shadowMesh.clear();int ox=c.cx*CS,oz=c.cz*CS;
+        // Soft projected tree shadows, rebuilt only when the chunk mesh changes.
+        for(int y=1;y<HEIGHT-1;y++)for(int z=1;z<CS-1;z++)for(int x=1;x<CS-1;x++){
+            if(c.get(x,y,z)!=4||c.get(x,y-1,z)==4)continue;
+            float sx=(float)(ox+x)+1.35f,sz=(float)(oz+z)+.85f;
+            const int segments=16;const float rings[3]={1.0f,.72f,.42f};
+            const float shades[3]={.13f,.18f,.22f};
+            for(int ring=0;ring<3;ring++){
+                float r0=rings[ring],r1=ring==0?1.18f:rings[ring-1];
+                V3 col{shades[ring],shades[ring],shades[ring]};
+                for(int k=0;k<segments;k++){
+                    float a0=2*PI*k/segments,a1=2*PI*(k+1)/segments;
+                    float x0=sx+std::cos(a0)*1.75f*r0,z0=sz+std::sin(a0)*.88f*r0;
+                    float x1=sx+std::cos(a1)*1.75f*r0,z1=sz+std::sin(a1)*.88f*r0;
+                    float xo0=sx+std::cos(a0)*1.75f*r1,zo0=sz+std::sin(a0)*.88f*r1;
+                    float xo1=sx+std::cos(a1)*1.75f*r1,zo1=sz+std::sin(a1)*.88f*r1;
+                    V3 p0{x0,(float)groundHeight((int)std::floor(x0),(int)std::floor(z0))+.018f,z0};
+                    V3 p1{x1,(float)groundHeight((int)std::floor(x1),(int)std::floor(z1))+.018f,z1};
+                    V3 q0{xo0,(float)groundHeight((int)std::floor(xo0),(int)std::floor(zo0))+.018f,zo0};
+                    V3 q1{xo1,(float)groundHeight((int)std::floor(xo1),(int)std::floor(zo1))+.018f,zo1};
+                    addTri(c.shadowMesh,p0,p1,q1,col);addTri(c.shadowMesh,p0,q1,q0,col);
+                }
+            }
+        }
         for(int y=0;y<HEIGHT;y++)for(int z=0;z<CS;z++)for(int x=0;x<CS;x++){
             uint8_t b=c.get(x,y,z);if(!b)continue;
             float X=(float)(ox+x),Y=(float)y,Z=(float)(oz+z);
@@ -384,12 +410,13 @@ class Game {
                 }
             }
         }
-        for(int i=0;i<5;i++){
-            float hx=-.91f+i*.075f,hy=.88f;V3 hc=health>=((i+1)*2)?V3{.92f,.10f,.14f}:(health==i*2+1?V3{.92f,.42f,.12f}:V3{.20f,.08f,.09f});
-            circ(hx-.012f,hy+.006f,.020f,hc);circ(hx+.012f,hy+.006f,.020f,hc);t(hx-.032f,hy,hx+.032f,hy,hx,hy-.050f,hc);
-            float sx=-.91f+i*.075f,sy=.77f;V3 sc=armor>=((i+1)*2)?V3{.30f,.67f,.95f}:V3{.13f,.19f,.24f};
-            t(sx-.026f,sy+.025f,sx+.026f,sy+.025f,sx,sy-.042f,sc);t(sx-.026f,sy+.025f,sx,sy-.042f,sx-.022f,sy-.005f,sc);t(sx+.026f,sy+.025f,sx+.022f,sy-.005f,sx,sy-.042f,sc);
-        }
+        const int hpPercent=std::clamp(health,0,10)*10, armorPercent=std::clamp(armor,0,10)*10;
+        drawText("HP "+std::to_string(hpPercent)+"%",-.94f,.91f,.019f,{1,1,1});
+        rect(-.94f,.855f,.43f,.025f,{.10f,.035f,.045f});
+        if(hpPercent>0)rect(-.94f,.855f,.43f*(hpPercent/100.0f),.025f,{.88f,.10f,.14f});
+        drawText("ARMOR "+std::to_string(armorPercent)+"%",-.94f,.785f,.017f,{.86f,.92f,1});
+        rect(-.94f,.735f,.43f,.022f,{.045f,.075f,.10f});
+        if(armorPercent>0)rect(-.94f,.735f,.43f*(armorPercent/100.0f),.022f,{.25f,.62f,.92f});
         rect(.84f,.79f,.13f,.15f,{.01f,.01f,.015f});rect(.86f,.81f,.09f,.11f,{.2f,.2f,.22f});line(.87f,.87f,.94f,.87f,.009f,{1,1,1});line(.87f,.83f,.94f,.83f,.009f,{1,1,1});
         for(int i=0;i<5;i++){float x=-.28f+i*.115f;rect(x,-.92f,.105f,.16f,i==selected?V3{1,.78f,.18f}:V3{.01f,.01f,.015f});rect(x+.008f,-.912f,.089f,.144f,{.2f,.2f,.22f});if(inventory[i].count){rect(x+.025f,-.88f,.055f,.075f,blockColor(inventory[i].id,2));drawText(inventory[i].count>=999999?"INF":std::to_string(inventory[i].count),x+.060f,-.89f,.010f,{1,1,1});}}
         draw(v,GL_TRIANGLES,m,0,0,0,false);if(statusFrames>0){drawText(status,-.85f,.66f,.018f,{1,1,1});statusFrames--;}
@@ -425,10 +452,16 @@ class Game {
         }
     }
     void drawText(const std::string&str,float x,float y,float scale,V3 color){
+        if(str.empty())return;
+        const float maxWidth=1.82f,maxHeight=.19f;
+        float effective=std::min(scale,std::min(maxWidth/(6.0f*str.size()),maxHeight/7.0f));
+        float textWidth=effective*6.0f*str.size();
+        x=std::clamp(x,-.97f,.97f-textWidth);
+        scale=effective;
         std::vector<float> v;float cursor=x;
         for(char c:str){if(c>='a'&&c<='z')c=(char)(c-'a'+'A');auto g=glyph(c);for(int row=0;row<7;row++)for(int col=0;col<5;col++)if(g[row]&(1<<(4-col))){
             float px0=cursor+col*scale,py0=y-row*scale;
-            addFace(v,{px0,py0,0},{px0+scale*.82f,py0,0},{px0+scale*.82f,py0+scale*.82f,0},{px0,py0+scale*.82f,0},color);
+            addFace(v,{px0,py0,0},{px0+scale*.72f,py0,0},{px0+scale*.72f,py0+scale*.72f,0},{px0,py0+scale*.72f,0},color);
         }cursor+=scale*6;}
         Mat4 ortho=identity();GLboolean depthWasEnabled=glIsEnabled(GL_DEPTH_TEST);glDisable(GL_DEPTH_TEST);draw(v,GL_TRIANGLES,ortho,0,0,0,false);if(depthWasEnabled)glEnable(GL_DEPTH_TEST);else glDisable(GL_DEPTH_TEST);
     }
@@ -532,14 +565,27 @@ class Game {
         float forward=joyY,side=joyX,mag=std::sqrt(forward*forward+side*side);if(mag>1){forward/=mag;side/=mag;}
         bool swimming=inWater();float speed=swimming?2.8f:5.2f;movePlayer((std::sin(yaw)*forward+std::cos(yaw)*side)*speed*dt,(-std::cos(yaw)*forward+std::sin(yaw)*side)*speed*dt);
         if(swimming){grounded=false;vy-=2.0f*dt;if(feet+1.2f<SEA_LEVEL)vy+=5.0f*dt;vy*=.94f;vy=std::clamp(vy,-2.0f,3.0f);feet+=vy*dt;}
-        else {if(grounded&&!supported())grounded=false;}
+        else {if(grounded&&!supported()){grounded=false;fallStartFeet=feet;fallTracking=true;}}
         if(!grounded&&!swimming){vy-=22*dt;float next=feet+vy*dt;if(vy<=0){int bx=(int)std::floor(px),bz=(int)std::floor(pz),by=(int)std::floor(next-.01f);
             if(solid(bx,by,bz)||solid((int)std::floor(px-.25f),by,(int)std::floor(pz-.25f))||
                solid((int)std::floor(px+.25f),by,(int)std::floor(pz+.25f))||
                solid((int)std::floor(px-.25f),by,(int)std::floor(pz+.25f))||
-               solid((int)std::floor(px+.25f),by,(int)std::floor(pz-.25f))){next=by+1;vy=0;grounded=true;}}
+               solid((int)std::floor(px+.25f),by,(int)std::floor(pz-.25f))){
+                next=by+1;vy=0;grounded=true;
+                if(fallTracking){
+                    float fallDistance=fallStartFeet-next;
+                    if(!creativeMode&&fallDistance>6.0f){
+                        int damage=std::max(1,(int)std::floor(fallDistance-5.0f));
+                        int absorbed=std::min(armor,damage);armor-=absorbed;damage-=absorbed;
+                        health=std::max(0,health-damage);
+                        if(health<=0){playerDead=true;swallowTimer=.001f;}
+                        else {status="FALL DAMAGE";statusFrames=90;}
+                    }
+                    fallTracking=false;
+                }
+            }}
             else if(vy>0){int by=(int)std::floor(next+1.8f);if(solid((int)std::floor(px),by,(int)std::floor(pz))){next=by-1.8f;vy=0;}}
-            feet=next;if(feet< -20){feet=5;vy=0;}}
+            feet=next;if(feet< -20){feet=5;vy=0;fallTracking=false;}}
         // Keep the feet on the surface of the generated grass layer.
         if(grounded&&feet<1.001f)feet=1.0f;
         if(breaking){int tx,ty,tz,ax,ay,az;if(raycast(tx,ty,tz,ax,ay,az)){if(tx!=breakX||ty!=breakY||tz!=breakZ){breakX=tx;breakY=ty;breakZ=tz;breakTimer=0;}auto it=chunks.find(chunkKey(floorDiv(tx,CS),floorDiv(tz,CS)));uint8_t q=it==chunks.end()?0:it->second.get(modp(tx,CS),ty,modp(tz,CS));breakTimer+=dt;if(q&&breakTimer>=breakDuration(q)){editBlock(false);breaking=false;breakTimer=0;}}else breakTimer=0;}
@@ -549,7 +595,8 @@ class Game {
         if(inWorld){saveTimer+=dt;if(saveTimer>=12.0f){saveWorld();saveTimer=0;}}
         updateWorld();
         glViewport(0,0,width,height);glClearColor(.48f,.74f,.96f,1);glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
-        Mat4 vp=mul(perspective(1.02f,(float)width/height,.1f,180),camera(px,feet+1.62f,pz,yaw,pitch));
+        Mat4 vp=mul(perspective(1.02f,(float)width/height,.1f,240),camera(px,feet+1.62f,pz,yaw,pitch));
+        for(auto&entry:chunks)draw(entry.second.shadowMesh,GL_TRIANGLES,vp,px,feet+1.62f,pz,true,false);
         for(auto&entry:chunks)draw(entry.second.mesh,GL_TRIANGLES,vp,px,feet+1.62f,pz,true,true);
         std::vector<float> clouds;
         auto cloudCube=[&](float x,float y,float z,float w,float h,float d){V3 a{x,y,z},b{x+w,y,z},c{x+w,y+h,z},dd{x,y+h,z},e{x,y,z+d},ff{x+w,y,z+d},g{x+w,y+h,z+d},hh{x,y+h,z+d};V3 col{.94f,.97f,1.0f};addFace(clouds,a,b,c,dd,col);addFace(clouds,ff,e,hh,g,col);addFace(clouds,e,a,dd,hh,col);addFace(clouds,b,ff,g,c,col);addFace(clouds,dd,c,g,hh,col);addFace(clouds,e,ff,b,a,col);};
@@ -639,7 +686,7 @@ public:
             if(x>-.72f&&x<-.47f&&y>.55f&&y<.73f){setLanMode(2);return 1;}
             if(x>.81f&&y>.72f){inventoryOpen=true;joyId=lookId=-1;joyX=joyY=0;breaking=false;return 1;}
             if(x<-.42f&&y<0){joyId=id;joyOriginX=x;joyOriginY=y;setJoy(x,y);}
-            else if(x>.65f&&y<-.43f){if(inWater()){vy=3.4f;grounded=false;}else if(grounded){vy=7.4f;grounded=false;}}
+            else if(x>.65f&&y<-.43f){if(inWater()){vy=3.4f;grounded=false;fallTracking=false;}else if(grounded){vy=7.4f;grounded=false;fallStartFeet=feet;fallTracking=true;}}
             else if(x>.65f&&y>-.34f&&y<.12f){int tx,ty,tz,ax,ay,az;if(raycast(tx,ty,tz,ax,ay,az)){breaking=true;breakPointer=id;breakX=tx;breakY=ty;breakZ=tz;breakTimer=0;}}
             else if(x>.40f&&x<.66f&&y>-.54f&&y<-.25f)editBlock(true);
             else if(x>.38f&&x<.64f&&y>-.22f&&y<.03f)attackGrafik();
