@@ -1,19 +1,64 @@
     void rebuild(Chunk&c){
         c.mesh.clear();c.shadowMesh.clear();int ox=c.cx*CS,oz=c.cz*CS;
-        // Classic block shading only; projected soft tree-shadow meshes removed.
+        auto localSolid=[&](int x,int y,int z){
+            if(x>=0&&x<CS&&z>=0&&z<CS){uint8_t q=c.get(x,y,z);return q!=0&&q!=9;}
+            return solid(ox+x,y,oz+z);
+        };
+        // Calculate ambient light once per block, not once per visible face.
         for(int y=0;y<HEIGHT;y++)for(int z=0;z<CS;z++)for(int x=0;x<CS;x++){
             uint8_t b=c.get(x,y,z);if(!b)continue;
+            bool skyVisible=true;
+            for(int sy=y+1;sy<HEIGHT;sy++)if(localSolid(x,sy,z)){skyVisible=false;break;}
+            float ambient=skyVisible?1.0f:.24f;
+            int occlusion=0;
+            const int ox4[4]={-1,1,0,0},oz4[4]={0,0,-1,1};
+            for(int n=0;n<4;n++)if(localSolid(x+ox4[n],y,z+oz4[n]))occlusion++;
+            float blockLight=std::max(.18f,ambient*(1.0f-occlusion*.10f));
+            if(b==1){
+                bool underTree=false;
+                for(int dz=-2;dz<=2&&!underTree;dz++)for(int dx=-2;dx<=2&&!underTree;dx++)
+                    for(int dy=2;dy<=5;dy++){
+                        int tx=x+dx,ty=y+dy,tz=z+dz;
+                        uint8_t q=(tx>=0&&tx<CS&&tz>=0&&tz<CS)?c.get(tx,ty,tz):blockAt(ox+tx,ty,oz+tz);
+                        if(q==5){underTree=true;break;}
+                    }
+                if(underTree)blockLight*=.52f;
+            }
             float X=(float)(ox+x),Y=(float)y,Z=(float)(oz+z);
             V3 p000{X,Y,Z},p100{X+1,Y,Z},p110{X+1,Y+1,Z},p010{X,Y+1,Z};
             V3 p001{X,Y,Z+1},p101{X+1,Y,Z+1},p111{X+1,Y+1,Z+1},p011{X,Y+1,Z+1};
-            if(!solid(ox+x,y,oz+z-1)&&c.get(x,y,z-1)!=9)addBlockFace(c.mesh,p000,p100,p110,p010,b,0,ox+x,y,oz+z);
-            if(!solid(ox+x,y,oz+z+1)&&c.get(x,y,z+1)!=9)addBlockFace(c.mesh,p101,p001,p011,p111,b,1,ox+x,y,oz+z);
-            if(!solid(ox+x,y+1,oz+z)&&c.get(x,y+1,z)!=9)addBlockFace(c.mesh,p010,p110,p111,p011,b,2,ox+x,y,oz+z);
-            if(!solid(ox+x,y-1,oz+z)&&c.get(x,y-1,z)!=9)addBlockFace(c.mesh,p001,p101,p100,p000,b,3,ox+x,y,oz+z);
-            if(!solid(ox+x-1,y,oz+z)&&c.get(x-1,y,z)!=9)addBlockFace(c.mesh,p001,p000,p010,p011,b,4,ox+x,y,oz+z);
-            if(!solid(ox+x+1,y,oz+z)&&c.get(x+1,y,z)!=9)addBlockFace(c.mesh,p100,p101,p111,p110,b,5,ox+x,y,oz+z);
+            if(!localSolid(x,y,z-1)&&c.get(x,y,z-1)!=9)addBlockFace(c.mesh,p000,p100,p110,p010,b,0,ox+x,y,oz+z,blockLight);
+            if(!localSolid(x,y,z+1)&&c.get(x,y,z+1)!=9)addBlockFace(c.mesh,p101,p001,p011,p111,b,1,ox+x,y,oz+z,blockLight);
+            if(!localSolid(x,y+1,z)&&c.get(x,y+1,z)!=9)addBlockFace(c.mesh,p010,p110,p111,p011,b,2,ox+x,y,oz+z,blockLight);
+            if(!localSolid(x,y-1,z)&&c.get(x,y-1,z)!=9)addBlockFace(c.mesh,p001,p101,p100,p000,b,3,ox+x,y,oz+z,blockLight);
+            if(!localSolid(x-1,y,z)&&c.get(x-1,y,z)!=9)addBlockFace(c.mesh,p001,p000,p010,p011,b,4,ox+x,y,oz+z,blockLight);
+            if(!localSolid(x+1,y,z)&&c.get(x+1,y,z)!=9)addBlockFace(c.mesh,p100,p101,p111,p110,b,5,ox+x,y,oz+z,blockLight);
         }
+        c.meshVertexCount=(GLsizei)(c.mesh.size()/8);
+        if(!c.mesh.empty()){
+            if(!c.meshVbo)glGenBuffers(1,&c.meshVbo);
+            glBindBuffer(GL_ARRAY_BUFFER,c.meshVbo);
+            glBufferData(GL_ARRAY_BUFFER,c.mesh.size()*sizeof(float),c.mesh.data(),GL_STATIC_DRAW);
+        }else if(c.meshVbo){
+            glDeleteBuffers(1,&c.meshVbo);c.meshVbo=0;
+        }
+        c.mesh.clear();c.mesh.shrink_to_fit();
         c.dirty=false;
+    }
+    void drawChunk(const Chunk&c,const Mat4&m,float cx,float cy,float cz){
+        if(!c.meshVbo||c.meshVertexCount<=0)return;
+        glUseProgram(program);
+        glUniformMatrix4fv(mvpLoc,1,GL_FALSE,m.m);glUniform3f(cameraLoc,cx,cy,cz);
+        glUniform1f(fogLoc,1.0f);glUniform1f(textureLoc,atlasTexture?1.0f:0.0f);
+        glUniform3f(skyColorLoc,skyTint.x,skyTint.y,skyTint.z);glUniform1f(animTimeLoc,animationTime);
+        glUniform1f(waterAnimationLoc,1.0f);glUniform1f(fogStartLoc,(float)drawDistance*CS*1.05f);
+        glUniform1f(fogEndLoc,(float)drawDistance*CS*1.65f);glUniform1f(worldLightLoc,worldBrightness);
+        glActiveTexture(GL_TEXTURE0);glBindTexture(GL_TEXTURE_2D,atlasTexture);
+        glBindVertexArray(vao);glBindBuffer(GL_ARRAY_BUFFER,c.meshVbo);
+        glEnableVertexAttribArray(0);glVertexAttribPointer(0,3,GL_FLOAT,GL_FALSE,8*sizeof(float),(void*)0);
+        glEnableVertexAttribArray(1);glVertexAttribPointer(1,3,GL_FLOAT,GL_FALSE,8*sizeof(float),(void*)(3*sizeof(float)));
+        glEnableVertexAttribArray(2);glVertexAttribPointer(2,2,GL_FLOAT,GL_FALSE,8*sizeof(float),(void*)(6*sizeof(float)));
+        glDrawArrays(GL_TRIANGLES,0,c.meshVertexCount);
     }
     void draw(const std::vector<float>&v,GLenum mode,const Mat4&m,float cx=0,float cy=0,float cz=0,bool fog=true,bool textured=false,GLuint textureOverride=0,bool animateWater=true){
         if(v.empty())return;glUseProgram(program);glUniformMatrix4fv(mvpLoc,1,GL_FALSE,m.m);glUniform3f(cameraLoc,cx,cy,cz);glUniform1f(fogLoc,fog?1.0f:0.0f);glUniform1f(textureLoc,textured&&(textureOverride||atlasTexture)?1.0f:0.0f);glUniform3f(skyColorLoc,skyTint.x,skyTint.y,skyTint.z);glUniform1f(animTimeLoc,animationTime);glUniform1f(waterAnimationLoc,textured&&!textureOverride&&animateWater?1.0f:0.0f);glUniform1f(fogStartLoc,(float)drawDistance*CS*1.05f);glUniform1f(fogEndLoc,(float)drawDistance*CS*1.65f);glUniform1f(worldLightLoc,worldBrightness);
