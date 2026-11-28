@@ -108,6 +108,7 @@
     }
     void updateGrafik(float dt){
         grafikHitTimer=std::max(0.0f,grafikHitTimer-dt);
+        if(lanMode==2)return;
         if(!grafikAlive){grafikRespawn+=dt;if(grafikRespawn>18.0f){grafikAlive=true;grafikHealth=6;grafikHitTimer=0;grafikX=px+6.0f;grafikZ=pz-5.0f;grafikFeet=(float)groundHeight((int)std::floor(grafikX),(int)std::floor(grafikZ));}return;}
         if(playerDead||creativeMode)return;
         float dx=px-grafikX,dz=pz-grafikZ,dist=std::sqrt(dx*dx+dz*dz);
