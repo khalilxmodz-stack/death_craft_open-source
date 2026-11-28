@@ -162,9 +162,9 @@
         auto point=[&](float x,float y,float z){
             float rx=x*std::cos(swing)-y*std::sin(swing);
             float ry=x*std::sin(swing)+y*std::cos(swing);
-            return V3{origin.x+right.x*rx+up.x*ry+forward.x*z,
-                      origin.y+right.y*rx+up.y*ry+forward.y*z,
-                      origin.z+right.z*rx+up.z*ry+forward.z*z};
+            return V3{origin.x+right.x*rx*.84f+up.x*ry*.84f+forward.x*z*.84f,
+                      origin.y+right.y*rx*.84f+up.y*ry*.84f+forward.y*z*.84f,
+                      origin.z+right.z*rx*.84f+up.z*ry*.84f+forward.z*z*.84f};
         };
         std::vector<float> mesh;
         auto quad=[&](V3 a,V3 b,V3 c,V3 d,V3 color){addFace(mesh,point(a.x,a.y,a.z),point(b.x,b.y,b.z),point(c.x,c.y,c.z),point(d.x,d.y,d.z),color);};
@@ -193,6 +193,41 @@
         box(-.067f,-.12f,-.060f,.067f,-.085f,.060f,{.22f,.115f,.05f});
         box(-.09f,-.325f,-.075f,.09f,-.27f,.075f,{.48f,.29f,.12f});
         box(-.055f,.035f,-.055f,.055f,.075f,.055f,{.88f,.90f,.94f});
+        glDisable(GL_DEPTH_TEST);draw(mesh,GL_TRIANGLES,vp,px,feet+1.62f,pz,false,false);glEnable(GL_DEPTH_TEST);
+    }
+    void drawHeldPickaxe(const Mat4&vp){
+        if(selected<0||selected>=(int)inventory.size()||inventory[selected].count<=0||inventory[selected].id!=12)return;
+        V3 right{std::cos(yaw),0,std::sin(yaw)};
+        V3 up{-std::sin(yaw)*std::sin(pitch),std::cos(pitch),std::cos(yaw)*std::sin(pitch)};
+        V3 forward{std::sin(yaw)*std::cos(pitch),std::sin(pitch),-std::cos(yaw)*std::cos(pitch)};
+        V3 origin{px+forward.x*.68f+right.x*.34f-up.x*.34f,
+                  feet+1.62f+forward.y*.68f+right.y*.34f-up.y*.34f,
+                  pz+forward.z*.68f+right.z*.34f-up.z*.34f};
+        float swing=swordCooldown>0?std::sin((.34f-swordCooldown)/.34f*PI)*.38f:0.0f;
+        auto point=[&](float x,float y,float z){
+            float rx=x*std::cos(swing)-y*std::sin(swing),ry=x*std::sin(swing)+y*std::cos(swing);
+            return V3{origin.x+right.x*rx*.86f+up.x*ry*.86f+forward.x*z*.86f,
+                      origin.y+right.y*rx*.86f+up.y*ry*.86f+forward.y*z*.86f,
+                      origin.z+right.z*rx*.86f+up.z*ry*.86f+forward.z*z*.86f};
+        };
+        std::vector<float> mesh;
+        auto quad=[&](V3 a,V3 b,V3 c,V3 d,V3 color){addFace(mesh,point(a.x,a.y,a.z),point(b.x,b.y,b.z),point(c.x,c.y,c.z),point(d.x,d.y,d.z),color);};
+        auto box=[&](float x0,float y0,float z0,float x1,float y1,float z1,V3 color){
+            V3 a{x0,y0,z0},b{x1,y0,z0},c{x1,y1,z0},d{x0,y1,z0},e{x0,y0,z1},f{x1,y0,z1},g{x1,y1,z1},h{x0,y1,z1};
+            quad(a,b,c,d,color);quad(f,e,h,g,{color.x*.66f,color.y*.68f,color.z*.72f});
+            quad(e,a,d,h,{color.x*.78f,color.y*.78f,color.z*.82f});quad(b,f,g,c,{color.x*.82f,color.y*.82f,color.z*.86f});
+            quad(d,c,g,h,{std::min(1.0f,color.x*1.12f),std::min(1.0f,color.y*1.12f),std::min(1.0f,color.z*1.12f)});
+            quad(e,f,b,a,{color.x*.58f,color.y*.58f,color.z*.62f});
+        };
+        // Carved brown wooden shaft with a dark grip and metal collar.
+        box(-.045f,-.34f,-.045f,.045f,.31f,.045f,{.42f,.24f,.10f});
+        box(-.052f,-.31f,-.052f,.052f,-.22f,.052f,{.25f,.13f,.055f});
+        box(-.055f,.22f,-.060f,.055f,.29f,.060f,{.60f,.64f,.69f});
+        // Broad silver pick head, beveled centre and tapered pointed ends.
+        box(-.30f,.28f,-.075f,.30f,.37f,.075f,{.68f,.73f,.80f});
+        quad({-.30f,.28f,-.075f},{-.43f,.20f,0},{-.30f,.37f,-.075f},{-.30f,.37f,.075f},{.78f,.82f,.88f});
+        quad({.30f,.28f,.075f},{.43f,.20f,0},{.30f,.37f,.075f},{.30f,.28f,-.075f},{.52f,.58f,.67f});
+        box(-.12f,.30f,-.085f,.12f,.405f,.085f,{.84f,.88f,.94f});
         glDisable(GL_DEPTH_TEST);draw(mesh,GL_TRIANGLES,vp,px,feet+1.62f,pz,false,false);glEnable(GL_DEPTH_TEST);
     }
     void updateWorldEffects(float dt){
@@ -431,6 +466,7 @@
             glDisable(GL_CULL_FACE);draw(edge,GL_LINES,vp,px,feet+1.62f,pz,true);
         }
         drawHeldSword(vp);
+        drawHeldPickaxe(vp);
         if(settingsOpen)drawSettings();else if(inventoryOpen)drawInventory();else drawHud();
         int gameMinutes=(int)(dayClock/1200.0f*1440.0f)%1440;
         std::string clockText=(gameMinutes/60<10?"0":"")+std::to_string(gameMinutes/60)+":"+(gameMinutes%60<10?"0":"")+std::to_string(gameMinutes%60);
