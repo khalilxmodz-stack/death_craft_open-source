@@ -78,10 +78,10 @@
         }
         glDisable(GL_DEPTH_TEST);draw(v,GL_TRIANGLES,vp,px,feet+1.62f,pz,false,false);glEnable(GL_DEPTH_TEST);
     }
-    void spawnDroppedItem(uint8_t id,float x,float y,float z){
+    void spawnDroppedItem(uint8_t id,float x,float y,float z,int count=1){
         if(!id)return;
-        DroppedItem item{};item.id=id;item.x=x;item.y=y;item.z=z;item.vx=std::sin(yaw)*.9f;item.vy=1.6f;item.vz=-std::cos(yaw)*.9f;droppedItems.push_back(item);
-        if(lanMode){LanPacket packet{};packet.type=8;packet.player=networkId;packet.block=id;packet.x=x;packet.y=y;packet.z=z;sendLan(packet);}
+        DroppedItem item{};item.id=id;item.count=std::max(1,count);item.x=x;item.y=y;item.z=z;item.vx=std::sin(yaw)*.9f;item.vy=1.6f;item.vz=-std::cos(yaw)*.9f;droppedItems.push_back(item);
+        if(lanMode){LanPacket packet{};packet.type=8;packet.player=networkId;packet.block=id;packet.flags=(uint8_t)std::clamp(item.count,1,255);packet.x=x;packet.y=y;packet.z=z;sendLan(packet);}
     }
     void spawnBlockEffects(int x,int y,int z,uint8_t id){
         DroppedItem item{};item.id=id;item.x=x+.5f;item.y=y+.48f;item.z=z+.5f;
@@ -102,7 +102,7 @@
             int bx=(int)std::floor(it->x),bz=(int)std::floor(it->z);
             for(int by=(int)std::floor(it->y);by>=0;--by)if(solid(bx,by,bz)){float floorY=by+1.0f;if(it->y<floorY+.13f){it->y=floorY+.13f;it->vy=it->vy<-.8f?-.16f:0.0f;it->vx*=.72f;it->vz*=.72f;}break;}
             float dx=it->x-(px),dy=it->y-(feet+.75f),dz=it->z-pz;
-            if(dx*dx+dy*dy+dz*dz<2.25f){if(addItem(it->id,1)){if(lanMode){LanPacket packet{};packet.type=9;packet.player=networkId;packet.block=it->id;packet.x=it->x;packet.y=it->y;packet.z=it->z;sendLan(packet);}it=droppedItems.erase(it);continue;}}
+            if(dx*dx+dy*dy+dz*dz<2.25f){if(addItem(it->id,it->count)){if(lanMode){LanPacket packet{};packet.type=9;packet.player=networkId;packet.block=it->id;packet.x=it->x;packet.y=it->y;packet.z=it->z;sendLan(packet);}it=droppedItems.erase(it);continue;}}
             if(it->age>120.0f){it=droppedItems.erase(it);continue;}
             ++it;
         }
