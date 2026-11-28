@@ -10,7 +10,10 @@ Native Android voxel sandbox built with **C++20**, Android NDK, CMake, and OpenG
 - Classic pixel-style tree foliage texture at `app/src/main/assets/textures/grass_tree_texture.png`.
 - A complete 20-minute day/night cycle (10 minutes daylight and 10 minutes night), with a fixed-world sun, moon, and yellow stars that disappear in daylight.
 - A small in-game digital clock, black nighttime sky, and slow animated water surface (water vertices only; HUD and text remain stationary).
-- KHALIL, a chasing creeper-like monster that flashes before exploding; loads `khalil_monster.png` from Android assets and uses a solid-white texture if the file is absent.
+- KHALIL, a faster and more aggressive chasing monster that can kill the player with its close-range explosion; loads `khalil_monster.png` and uses a solid-white texture if absent.
+- Placeable TNT: use a placed TNT block to start a 2-second fuse, then blast nearby blocks and damage or kill nearby players.
+- Expanded view distance and a slightly denser cloud field drifting slowly across the sky.
+- Inventory and hotbar block icons use the same texture atlas as the world; `textures/tnt.png` is optional and defaults to solid white when missing.
 - Block-breaking particle bursts, physical dropped block items, and automatic pickup at close range.
 - Player name, FPS counter, hotbar, inventory, and LAN host/join prototype.
 - World fog and view distance tuned for mobile rendering.
