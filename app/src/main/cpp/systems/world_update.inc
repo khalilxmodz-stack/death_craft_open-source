@@ -1,10 +1,22 @@
     void updateWorld(){
         int cx=floorDiv((int)std::floor(px),CS),cz=floorDiv((int)std::floor(pz),CS);
-        for(int z=-drawDistance;z<=drawDistance;z++)for(int x=-drawDistance;x<=drawDistance;x++)ensureChunk(cx+x,cz+z);
+        // Create nearby chunks first so the visible area becomes ready before the horizon.
+        for(int radius=0;radius<=drawDistance;radius++)
+            for(int z=-radius;z<=radius;z++)for(int x=-radius;x<=radius;x++)
+                if(std::max(std::abs(x),std::abs(z))==radius)ensureChunk(cx+x,cz+z);
         for(auto it=chunks.begin();it!=chunks.end();){
-            if(std::abs(it->second.cx-cx)>drawDistance+1||std::abs(it->second.cz-cz)>drawDistance+1)it=chunks.erase(it);else ++it;
+            if(std::abs(it->second.cx-cx)>drawDistance+1||std::abs(it->second.cz-cz)>drawDistance+1){
+                if(it->second.meshVbo)glDeleteBuffers(1,&it->second.meshVbo);
+                it=chunks.erase(it);
+            }else ++it;
         }
-        for(auto&entry:chunks)if(entry.second.dirty)rebuild(entry.second);
+        // Bound mesh work per frame; never rebuild the entire dirty world in one frame.
+        int rebuildBudget=3;
+        while(rebuildBudget-->0&&!dirtyChunkQueue.empty()){
+            uint64_t key=dirtyChunkQueue.front();dirtyChunkQueue.pop_front();
+            auto it=chunks.find(key);
+            if(it!=chunks.end()&&it->second.dirty)rebuild(it->second);
+        }
     }
     void updateSky(){
         float phase=dayClock/1200.0f;
@@ -121,8 +133,7 @@
             if(flowed>=20||y<0||y>=HEIGHT||blockAt(x,y,z)!=0)return;
             Chunk& target=ensureChunk(floorDiv(x,CS),floorDiv(z,CS));
             target.set(modp(x,CS),y,modp(z,CS),9);
-            edits[{x,y,z}]=9;waterFlowDepth[{x,y,z}]=depth;
-            for(auto& entry:chunks)entry.second.dirty=true;
+            edits[{x,y,z}]=9;waterFlowDepth[{x,y,z}]=depth;markBlockDirty(x,y,z);
             if(lanMode==1){LanPacket packet{};packet.type=3;packet.player=networkId;packet.bx=x;packet.by=y;packet.bz=z;packet.block=9;sendLan(packet);}
             flowed++;
         };
@@ -296,7 +307,7 @@
                 if(dx*dx+dy*dy+dz*dz>12.25f)continue;
                 uint8_t block=blockAt(bx,by,bz);if(!block)continue;
                 Chunk&chunk=ensureChunk(floorDiv(bx,CS),floorDiv(bz,CS));
-                chunk.set(modp(bx,CS),by,modp(bz,CS),0);edits[{bx,by,bz}]=0;
+                chunk.set(modp(bx,CS),by,modp(bz,CS),0);edits[{bx,by,bz}]=0;markBlockDirty(bx,by,bz);
                 if(lanMode==1){LanPacket packet{};packet.type=3;packet.player=networkId;packet.bx=bx;packet.by=by;packet.bz=bz;packet.block=0;sendLan(packet);}
             }
             float dx=px-it->x,dy=feet+.85f-it->y,dz=pz-it->z;
@@ -308,7 +319,6 @@
                 if(health<=0){playerDead=true;swallowTimer=.001f;deathMessage="KILLED BY TNT";}
             }else{status="TNT EXPLODED";statusFrames=100;}
             if(lanMode==1){LanPacket event{};event.type=5;event.player=networkId;event.x=explosionX;event.y=explosionY;event.z=explosionZ;sendLan(event);}
-            for(auto&entry:chunks)entry.second.dirty=true;
             it=primedTnts.erase(it);
         }
     }
@@ -456,7 +466,24 @@
         updateWorld();
         glViewport(0,0,width,height);glClearColor(skyTint.x,skyTint.y,skyTint.z,1);glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
         Mat4 vp=mul(perspective(1.02f,(float)width/height,.1f,std::max(120.0f,(float)drawDistance*CS*2.5f)),camera(px,feet+1.62f,pz,yaw,pitch));drawSkyDecor(vp);glClear(GL_DEPTH_BUFFER_BIT);
-        for(auto&entry:chunks)draw(entry.second.mesh,GL_TRIANGLES,vp,px,feet+1.62f,pz,true,true);
+        std::array<std::array<float,4>,6> frustum{};
+        const float* m=vp.m;
+        for(int i=0;i<6;i++){
+            int sign=(i&1)?-1:1,axis=i/2;
+            frustum[i]={m[3]+sign*m[axis*4],m[7]+sign*m[axis*4+1],m[11]+sign*m[axis*4+2],m[15]+sign*m[axis*4+3]};
+            float len=std::sqrt(frustum[i][0]*frustum[i][0]+frustum[i][1]*frustum[i][1]+frustum[i][2]*frustum[i][2]);
+            if(len>0)for(float&v:frustum[i])v/=len;
+        }
+        for(const auto&entry:chunks){
+            const Chunk&c=entry.second;
+            float x=c.cx*CS+CS*.5f,y=HEIGHT*.5f,z=c.cz*CS+CS*.5f;
+            bool visible=true;
+            for(const auto&p:frustum){
+                float radius=std::abs(p[0])*CS*.5f+std::abs(p[1])*HEIGHT*.5f+std::abs(p[2])*CS*.5f;
+                if(p[0]*x+p[1]*y+p[2]*z+p[3]+radius<0){visible=false;break;}
+            }
+            if(visible)drawChunk(c,vp,px,feet+1.62f,pz);
+        }
         std::vector<float> clouds;
         auto cloudCube=[&](float x,float y,float z,float w,float h,float d){V3 a{x,y,z},b{x+w,y,z},c{x+w,y+h,z},dd{x,y+h,z},e{x,y,z+d},ff{x+w,y,z+d},g{x+w,y+h,z+d},hh{x,y+h,z+d};V3 col{.94f,.97f,1.0f};addFace(clouds,a,b,c,dd,col);addFace(clouds,ff,e,hh,g,col);addFace(clouds,e,a,dd,hh,col);addFace(clouds,b,ff,g,c,col);addFace(clouds,dd,c,g,hh,col);addFace(clouds,e,ff,b,a,col);};
         for(int iz=-2;iz<=2;iz++)for(int ix=-3;ix<=3;ix++){float drift=std::fmod(animationTime*.18f,24.0f);float x=std::floor(px/24.0f)*24.0f+ix*24.0f+((ix+iz)&1?5.0f:0.0f)+drift,z=std::floor(pz/24.0f)*24.0f+iz*24.0f;float y=19.0f+((ix*3+iz*5)&1)*2.0f;cloudCube(x,y,z,7.0f,1.4f,4.0f);cloudCube(x+3.0f,y+.5f,z-1.0f,5.0f,1.5f,5.0f);cloudCube(x-2.0f,y+.3f,z+1.0f,4.0f,1.2f,3.0f);}
