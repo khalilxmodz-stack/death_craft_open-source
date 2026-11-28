@@ -50,17 +50,15 @@
             if(selectedBlock()==11||selectedBlock()==12||selectedBlock()==15||selectedBlock()==16||selectedBlock()==17){status="TOOLS AND ITEMS CANNOT BE PLACED";statusFrames=70;return;}
             if(!inventory[selected].count){status="Select a block";statusFrames=90;return;}uint8_t item=selectedBlock();if(ay<0||ay>=HEIGHT)return;
             if(overlaps(ax+.5f,ay,az+.5f)){status="Cannot place inside player";statusFrames=90;return;}
-            int cx=floorDiv(ax,CS),cz=floorDiv(az,CS);Chunk&c=ensureChunk(cx,cz);c.set(modp(ax,CS),ay,modp(az,CS),item);edits[{ax,ay,az}]=item;consumeSelected();
+            int cx=floorDiv(ax,CS),cz=floorDiv(az,CS);Chunk&c=ensureChunk(cx,cz);c.set(modp(ax,CS),ay,modp(az,CS),item);edits[{ax,ay,az}]=item;markBlockDirty(ax,ay,az);consumeSelected();
             if(lanMode){LanPacket packet{};packet.type=3;packet.player=networkId;packet.bx=ax;packet.by=ay;packet.bz=az;packet.block=item;sendLan(packet);}
         }else{
             uint8_t broken=0;auto it=chunks.find(chunkKey(floorDiv(x,CS),floorDiv(z,CS)));if(it!=chunks.end())broken=it->second.get(modp(x,CS),y,modp(z,CS));
-            int cx=floorDiv(x,CS),cz=floorDiv(z,CS);Chunk&c=ensureChunk(cx,cz);c.set(modp(x,CS),y,modp(z,CS),0);edits[{x,y,z}]=0;waterFlowDepth.erase({x,y,z});
+            int cx=floorDiv(x,CS),cz=floorDiv(z,CS);Chunk&c=ensureChunk(cx,cz);c.set(modp(x,CS),y,modp(z,CS),0);edits[{x,y,z}]=0;waterFlowDepth.erase({x,y,z});markBlockDirty(x,y,z);
             uint8_t dropId=broken==4?4:(broken==5?5:(broken==13?17:(broken==3?3:((broken==1||broken==2)?2:(broken==6?6:broken)))));
             if(dropId)spawnBlockEffects(x,y,z,dropId);
             if(lanMode){LanPacket packet{};packet.type=3;packet.player=networkId;packet.bx=x;packet.by=y;packet.bz=z;packet.block=0;sendLan(packet);}
         }
-        // Adjacent chunks may expose a newly visible border face.
-        for(auto&entry:chunks)entry.second.dirty=true;
         status=place?"Block placed":"Block broken";statusFrames=60;
     }
     void useTarget(){
@@ -70,9 +68,8 @@
         if(raycast(x,y,z,ax,ay,az)&&blockAt(x,y,z)==10){
             auto it=chunks.find(chunkKey(floorDiv(x,CS),floorDiv(z,CS)));
             if(it!=chunks.end())it->second.set(modp(x,CS),y,modp(z,CS),0);
-            edits[{x,y,z}]=0;
+            edits[{x,y,z}]=0;markBlockDirty(x,y,z);
             primedTnts.push_back({x+.5f,y+.5f,z+.5f,2.0f});
-            for(auto&entry:chunks)entry.second.dirty=true;
             status="TNT PRIMED - 2 SECONDS";statusFrames=100;
             if(lanMode){LanPacket packet{};packet.type=3;packet.player=networkId;packet.bx=x;packet.by=y;packet.bz=z;packet.block=0;sendLan(packet);}
             return;
