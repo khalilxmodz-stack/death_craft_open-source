@@ -113,7 +113,7 @@ class Game {
     int selected=0,breakPointer=-1,breakX=0,breakY=0,breakZ=0,dragIndex=-1,dragPointer=-1;
     float breakTimer=0;
     int health=10,armor=10,grafikHealth=6;
-    float grafikHitTimer=0.0f;
+    float grafikHitTimer=0.0f,swordCooldown=0.0f;
     bool smoothGraphics=true,settingsOpen=false;
     int drawDistance=7;
     bool creativeMode=true,flatWorld=false,inWorld=false;
