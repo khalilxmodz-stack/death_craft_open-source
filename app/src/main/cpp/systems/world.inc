@@ -573,6 +573,7 @@
         }
         c.dirty = true;
     }
+    // Returns a loaded chunk or creates it before it is accessed.
     Chunk& ensureChunk(int cx, int cz) {
         uint64_t k = chunkKey(cx, cz);
         auto it = chunks.find(k);
