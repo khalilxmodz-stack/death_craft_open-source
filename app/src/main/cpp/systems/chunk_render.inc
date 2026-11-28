@@ -25,9 +25,19 @@
         glDrawArrays(mode,0,(GLsizei)(v.size()/8));
     }
     void drawBlockIcon(uint8_t id,float x,float y,float w,float h){
-        int tile=id==11?6:(id==10?5:(id==9?4:(id==3?2:(id==5?3:((id==1)?0:1)))));
-        float u0=(tile+.035f)/7.0f,u1=(tile+.965f)/7.0f,v0=.035f,v1=.965f;
         std::vector<float> icon;V3 white{1,1,1};
+        if(id==11){
+            float cx=x+w*.5f;
+            addTri(icon,{cx-w*.11f,y+h*.22f,0},{cx+w*.11f,y+h*.22f,0},{cx,y+h*.98f,0},{.88f,.92f,.98f});
+            addTri(icon,{cx-w*.11f,y+h*.22f,0},{cx,y+h*.98f,0},{cx-w*.02f,y+h*.22f,0},{.98f,.99f,1});
+            addTri(icon,{x+w*.18f,y+h*.18f,0},{x+w*.82f,y+h*.18f,0},{x+w*.76f,y+h*.27f,0},{.72f,.76f,.82f});
+            addTri(icon,{x+w*.18f,y+h*.18f,0},{x+w*.76f,y+h*.27f,0},{x+w*.24f,y+h*.27f,0},{.72f,.76f,.82f});
+            addTri(icon,{cx-w*.07f,y+h*.18f,0},{cx+w*.07f,y+h*.18f,0},{cx+w*.06f,y+h*.02f,0},{.38f,.21f,.09f});
+            addTri(icon,{cx-w*.07f,y+h*.18f,0},{cx+w*.06f,y+h*.02f,0},{cx-w*.06f,y+h*.02f,0},{.48f,.28f,.12f});
+            draw(icon,GL_TRIANGLES,identity(),0,0,0,false,false,0,false);return;
+        }
+        int tile=id==10?5:(id==9?4:(id==3?2:(id==5?3:((id==1)?0:1))));
+        float u0=(tile+.035f)/7.0f,u1=(tile+.965f)/7.0f,v0=.035f,v1=.965f;
         addTri(icon,{x,y,0},{x+w,y,0},{x+w,y+h,0},white,u0,v0,u1,v0,u1,v1);
         addTri(icon,{x,y,0},{x+w,y+h,0},{x,y+h,0},white,u0,v0,u1,v1,u0,v1);
         draw(icon,GL_TRIANGLES,identity(),0,0,0,false,true,0,false);
@@ -75,7 +85,7 @@
         if(armorPercent>0)rect(-.94f,.735f,.43f*(armorPercent/100.0f),.022f,{.25f,.62f,.92f});
         rect(.84f,.79f,.13f,.15f,{.01f,.01f,.015f});rect(.86f,.81f,.09f,.11f,{.2f,.2f,.22f});line(.87f,.87f,.94f,.87f,.009f,{1,1,1});line(.87f,.83f,.94f,.83f,.009f,{1,1,1});
         for(int i=0;i<5;i++){float x=-.28f+i*.115f;rect(x,-.92f,.105f,.16f,i==selected?V3{1,.78f,.18f}:V3{.01f,.01f,.015f});rect(x+.008f,-.912f,.089f,.144f,{.2f,.2f,.22f});if(inventory[i].count){rect(x+.025f,-.88f,.055f,.075f,blockColor(inventory[i].id,2));drawText(inventory[i].count>=999999?"INF":std::to_string(inventory[i].count),x+.060f,-.89f,.007f,{1,1,1});}}
-        draw(v,GL_TRIANGLES,m,0,0,0,false);for(int i=0;i<5;i++)if(inventory[i].count)drawBlockIcon(inventory[i].id,-.28f+i*.115f+.025f,-.88f,.055f,.075f);if(inventory[selected].id==11&&inventory[selected].count>0)drawBlockIcon(11,.32f,-.73f,.24f,.34f);if(statusFrames>0){drawText(status,-.85f,.66f,.018f,{1,1,1});statusFrames--;}
+        draw(v,GL_TRIANGLES,m,0,0,0,false);for(int i=0;i<5;i++)if(inventory[i].count)drawBlockIcon(inventory[i].id,-.28f+i*.115f+.025f,-.88f,.055f,.075f);if(statusFrames>0){drawText(status,-.85f,.66f,.018f,{1,1,1});statusFrames--;}
         if(playerDead){float k=std::clamp(swallowTimer/2.8f,0.0f,1.0f);std::vector<float> overlay;addFace(overlay,{-1,-1,0},{1,-1,0},{1,1,0},{-1,1,0},{.015f+.035f*k,.005f,.018f+.025f*k});draw(overlay,GL_TRIANGLES,identity(),0,0,0,false);std::vector<float>mouth;for(int i=0;i<48;i++){float a=i*2*PI/48,b=(i+1)*2*PI/48;addTri(mouth,{0,0,0},{std::cos(a)*(.10f+.70f*k),std::sin(a)*(.10f+.70f*k),0},{std::cos(b)*(.10f+.70f*k),std::sin(b)*(.10f+.70f*k),0},{.005f,.002f,.008f});}draw(mouth,GL_TRIANGLES,identity(),0,0,0,false);drawText("GRAFIK ATE YOU",-.52f,-.72f,.035f,{1,.25f,.30f});}
         glEnable(GL_DEPTH_TEST);
     }
