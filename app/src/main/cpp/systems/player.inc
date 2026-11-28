@@ -2,7 +2,7 @@
     // Function comments describe each method's responsibility and its place in the game systems.
 
     // Tests whether the player's body intersects any solid block.
-    bool overlaps(float x, float y, float z) {
+    float x, float y, float z) {
         const float radius = .30f;
         for (int bx = (int)std::floor(x - radius); bx <= (int)std::floor(x + radius); bx++)
             for (int by = (int)std::floor(y); by <= (int)std::floor(y + 1.8f); by++)
@@ -12,7 +12,7 @@
         return false;
     }
     // Finds the ground height beneath a candidate horizontal position.
-    float groundAt(float x, float z, float reference) {
+    float x, float z, float reference) {
         int bx = (int)std::floor(x), bz = (int)std::floor(z);
         for (int y = (int)std::floor(reference + 1.05f); y >= (int)std::floor(reference - .20f);
              y--)
@@ -21,7 +21,7 @@
         return reference;
     }
     // Checks whether the player's feet are supported by nearby blocks.
-    bool supported() {
+    ) {
         const float r = .23f;
         float samples[5][2] = {
             {px, pz}, {px - r, pz - r}, {px + r, pz - r}, {px - r, pz + r}, {px + r, pz + r}};
@@ -31,7 +31,7 @@
         return false;
     }
     // Attempts to step the player onto a slightly higher block.
-    bool tryStep(float nx, float nz) {
+    float nx, float nz) {
         const float r = .23f;
         float samples[5][2] = {
             {nx, nz}, {nx - r, nz - r}, {nx + r, nz - r}, {nx - r, nz + r}, {nx + r, nz + r}};
@@ -49,7 +49,7 @@
         return false;
     }
     // Moves the player in small collision-tested horizontal steps.
-    void movePlayer(float dx, float dz) {
+    float dx, float dz) {
         float distance = std::max(std::abs(dx), std::abs(dz));
         int steps = std::max(1, (int)std::ceil(distance / .14f));
         float sx = dx / steps, sz = dz / steps;
@@ -67,7 +67,7 @@
         }
     }
     // Traces the view direction to find a target block and adjacent cell.
-    bool raycast(int& hx, int& hy, int& hz, int& px0, int& py0, int& pz0) {
+    int& hx, int& hy, int& hz, int& px0, int& py0, int& pz0) {
         V3 d{std::sin(yaw) * std::cos(pitch), std::sin(pitch), -std::cos(yaw) * std::cos(pitch)};
         int lastX = 0, lastY = 0, lastZ = 0;
         for (float t = .15f; t < 6.0f; t += .06f) {
@@ -89,7 +89,7 @@
         return false;
     }
     // Places a selected block or breaks the targeted block.
-    void editBlock(bool place) {
+    bool place) {
         int x, y, z, ax, ay, az;
         if (!raycast(x, y, z, ax, ay, az)) {
             status = "No block in reach";
@@ -192,7 +192,7 @@
         }
     }
     // Uses the targeted object, such as a door, bed, table, or TNT.
-    void useTarget() {
+    ) {
         int x, y, z, ax, ay, az;
         if (raycast(x, y, z, ax, ay, az) && (blockAt(x, y, z) == 20 || blockAt(x, y, z) == 21 ||
                                              blockAt(x, y, z) == 22 || blockAt(x, y, z) == 23)) {
@@ -287,7 +287,8 @@
         }
         attackMonster();
     }
-    void attackMonster() {
+    // Applies the player's melee attack to a monster in reach.
+    ) {
         if (playerDead || swordCooldown > 0)
             return;
         playSound(0);
@@ -368,7 +369,7 @@
         }
     }
     // Updates Grafik's night behavior, movement, and respawning.
-    void updateGrafik(float dt) {
+    float dt) {
         grafikHitTimer = std::max(0.0f, grafikHitTimer - dt);
         if (!isNight()) {
             grafikAlive = false;
