@@ -2,6 +2,8 @@
 #include <android/log.h>
 #include <EGL/egl.h>
 #include <GLES3/gl3.h>
+#include <SLES/OpenSLES.h>
+#include <SLES/OpenSLES_Android.h>
 #include <cmath>
 #include <vector>
 #include <array>
@@ -91,7 +93,11 @@ struct LanPacket { uint32_t magic=0x44434654u; uint8_t type=0; uint32_t player=0
 
 class Game {
     EGLDisplay display=EGL_NO_DISPLAY; EGLSurface surface=EGL_NO_SURFACE; EGLContext context=EGL_NO_CONTEXT;
-    GLuint program=0,vao=0,vbo=0,atlasTexture=0,khalilTexture=0; GLint mvpLoc=-1,cameraLoc=-1,fogLoc=-1,textureLoc=-1,atlasLoc=-1,skyColorLoc=-1,animTimeLoc=-1,waterAnimationLoc=-1,fogStartLoc=-1,fogEndLoc=-1,worldLightLoc=-1;
+    GLuint program=0,vao=0,vbo=0,atlasTexture=0,khalilTexture=0;
+    SLObjectItf slEngineObject=nullptr,slOutputMix=nullptr;
+    SLEngineItf slEngine=nullptr;
+    SLObjectItf slPlayers[3]{}; SLPlayItf slPlay[3]{}; AAsset* soundAssets[3]{};
+    float footstepTimer=0.0f; GLint mvpLoc=-1,cameraLoc=-1,fogLoc=-1,textureLoc=-1,atlasLoc=-1,skyColorLoc=-1,animTimeLoc=-1,waterAnimationLoc=-1,fogStartLoc=-1,fogEndLoc=-1,worldLightLoc=-1;
     V3 skyTint{.48f,.74f,.96f};
     float dayClock=0.0f,animationTime=0.0f;
     bool nightActive=false;
@@ -162,6 +168,42 @@ class Game {
 #include "systems/menu.inc"
 
     void setJoy(float x,float y){joyX=std::clamp((x-joyOriginX)/.20f,-1.0f,1.0f);joyY=std::clamp((y-joyOriginY)/.20f,-1.0f,1.0f);}
+    void initAudio(AAssetManager* manager){
+        const SLInterfaceID ids[]={SL_IID_ENGINE};const SLboolean req[]={SL_BOOLEAN_TRUE};
+        if(slCreateEngine(&slEngineObject,0,nullptr,1,ids,req)!=SL_RESULT_SUCCESS)return;
+        if((*slEngineObject)->Realize(slEngineObject,SL_BOOLEAN_FALSE)!=SL_RESULT_SUCCESS)return;
+        if((*slEngineObject)->GetInterface(slEngineObject,SL_IID_ENGINE,&slEngine)!=SL_RESULT_SUCCESS)return;
+        if((*slEngine)->CreateOutputMix(slEngine,&slOutputMix,0,nullptr,nullptr)!=SL_RESULT_SUCCESS)return;
+        (*slOutputMix)->Realize(slOutputMix,SL_BOOLEAN_FALSE);
+        const char* names[]={"attack_sound.mp3","move_sound.mp3","tnt_explosive.mp3"};
+        for(int i=0;i<3;i++){
+            std::string path="textures/sound/"+std::string(names[i]);
+            soundAssets[i]=AAssetManager_open(manager,path.c_str(),AASSET_MODE_UNKNOWN);
+            if(!soundAssets[i])continue;
+            off_t start=0,length=0;int fd=AAsset_openFileDescriptor(soundAssets[i],&start,&length);if(fd<0)continue;
+            SLDataLocator_AndroidFD loc{SL_DATALOCATOR_ANDROIDFD,fd,start,length};
+            SLDataFormat_MIME fmt{SL_DATAFORMAT_MIME,nullptr,SL_CONTAINERTYPE_MP3};
+            SLDataSource source{&loc,&fmt};
+            SLDataLocator_OutputMix out{SL_DATALOCATOR_OUTPUTMIX,slOutputMix};
+            SLDataSink sink{&out,nullptr};
+            const SLInterfaceID pids[]={SL_IID_PLAY};const SLboolean preq[]={SL_BOOLEAN_TRUE};
+            if((*slEngine)->CreateAudioPlayer(slEngine,&slPlayers[i],&source,&sink,1,pids,preq)==SL_RESULT_SUCCESS&&
+               (*slPlayers[i])->Realize(slPlayers[i],SL_BOOLEAN_FALSE)==SL_RESULT_SUCCESS)
+                (*slPlayers[i])->GetInterface(slPlayers[i],SL_IID_PLAY,&slPlay[i]);
+            close(fd);
+        }
+    }
+    void playSound(int id){
+        if(id<0||id>=3||!slPlay[id])return;
+        (*slPlay[id])->SetPlayState(slPlay[id],SL_PLAYSTATE_STOPPED);
+        (*slPlay[id])->SetPosition(slPlay[id],0,SL_SEEKMODE_FAST);
+        (*slPlay[id])->SetPlayState(slPlay[id],SL_PLAYSTATE_PLAYING);
+    }
+    void shutdownAudio(){
+        for(int i=0;i<3;i++){if(slPlayers[i]){(*slPlayers[i])->Destroy(slPlayers[i]);slPlayers[i]=nullptr;slPlay[i]=nullptr;}if(soundAssets[i]){AAsset_close(soundAssets[i]);soundAssets[i]=nullptr;}}
+        if(slOutputMix){(*slOutputMix)->Destroy(slOutputMix);slOutputMix=nullptr;}
+        if(slEngineObject){(*slEngineObject)->Destroy(slEngineObject);slEngineObject=nullptr;slEngine=nullptr;}
+    }
 public:
     bool init(ANativeWindow*w,AAssetManager* manager,const char* dataDir){
         const EGLint attrs[]={EGL_RENDERABLE_TYPE,EGL_OPENGL_ES3_BIT,EGL_SURFACE_TYPE,EGL_WINDOW_BIT,EGL_RED_SIZE,8,EGL_GREEN_SIZE,8,EGL_BLUE_SIZE,8,EGL_ALPHA_SIZE,8,EGL_DEPTH_SIZE,16,EGL_NONE};
@@ -170,7 +212,7 @@ public:
         const EGLint ca[]={EGL_CONTEXT_CLIENT_VERSION,3,EGL_NONE};context=eglCreateContext(display,cfg,EGL_NO_CONTEXT,ca);surface=eglCreateWindowSurface(display,cfg,w,nullptr);
         if(context==EGL_NO_CONTEXT||surface==EGL_NO_SURFACE||!eglMakeCurrent(display,surface,surface,context))return false;
         eglQuerySurface(display,surface,EGL_WIDTH,&width);eglQuerySurface(display,surface,EGL_HEIGHT,&height);glViewport(0,0,width,height);
-        if(!setupGL())return false;loadTextures(manager);saveDirectory=dataDir?dataDir:".";loadPlayerName();feet=1;grafikFeet=1;health=10;armor=10;grafikHealth=2;selected=0;running=true;inWorld=false;return true;
+        if(!setupGL())return false;loadTextures(manager);initAudio(manager);saveDirectory=dataDir?dataDir:".";loadPlayerName();feet=1;grafikFeet=1;health=10;armor=10;grafikHealth=2;selected=0;running=true;inWorld=false;return true;
     }
     int input(AInputEvent*e){
         if(AInputEvent_getType(e)!=AINPUT_EVENT_TYPE_MOTION)return 0;int action=AMotionEvent_getAction(e)&AMOTION_EVENT_ACTION_MASK,idx=(AMotionEvent_getAction(e)&AMOTION_EVENT_ACTION_POINTER_INDEX_MASK)>>AMOTION_EVENT_ACTION_POINTER_INDEX_SHIFT;int id=AMotionEvent_getPointerId(e,idx);float x=AMotionEvent_getX(e,idx)/width*2-1,y=1-AMotionEvent_getY(e,idx)/height*2;
@@ -193,7 +235,7 @@ public:
         if(action==AMOTION_EVENT_ACTION_MOVE){for(size_t n=0;n<AMotionEvent_getPointerCount(e);n++){int pid=AMotionEvent_getPointerId(e,n);float tx=AMotionEvent_getX(e,n)/width*2-1,ty=1-AMotionEvent_getY(e,n)/height*2;if(pid==joyId)setJoy(tx,ty);if(pid==dragPointer){dragX=tx;dragY=ty;}if(pid==lookId){yaw+=(tx-lastX)*1.45f;pitch=std::clamp(pitch-(ty-lastY)*1.15f,-1.35f,1.35f);lastX=tx;lastY=ty;}}return 1;}
         if(action==AMOTION_EVENT_ACTION_UP||action==AMOTION_EVENT_ACTION_POINTER_UP||action==AMOTION_EVENT_ACTION_CANCEL){if(action==AMOTION_EVENT_ACTION_CANCEL){joyId=lookId=breakPointer=dragPointer=-1;joyX=joyY=0;breaking=false;dragIndex=-1;return 1;}if(id==joyId){joyId=-1;joyX=joyY=0;}if(id==lookId)lookId=-1;if(id==breakPointer){breakPointer=-1;breaking=false;breakTimer=0;}if(inventoryOpen&&id==dragPointer&&dragIndex>=0){int target=inventorySlotAt(x,y);if(target>=0&&target!=dragIndex)std::swap(inventory[target],inventory[dragIndex]);else if(target<0){Item dropped=inventory[dragIndex];if(dropped.count>0){spawnDroppedItem(dropped.id,px+std::sin(yaw)*1.0f,feet+.7f,pz-std::cos(yaw)*1.0f,creativeMode?1:dropped.count);if(!creativeMode)inventory[dragIndex]={};}}dragIndex=dragPointer=-1;}return 1;}return 1;
     }
-    void shutdown(){if(inWorld)saveWorld();running=false;if(lanSocket>=0){close(lanSocket);lanSocket=-1;}lanMode=0;remoteValid=false;for(auto&entry:chunks)if(entry.second.meshVbo){glDeleteBuffers(1,&entry.second.meshVbo);entry.second.meshVbo=0;entry.second.meshVertexCount=0;}chunks.clear();dirtyChunkQueue.clear();if(display!=EGL_NO_DISPLAY){eglMakeCurrent(display,EGL_NO_SURFACE,EGL_NO_SURFACE,EGL_NO_CONTEXT);if(context!=EGL_NO_CONTEXT)eglDestroyContext(display,context);if(surface!=EGL_NO_SURFACE)eglDestroySurface(display,surface);eglTerminate(display);}display=EGL_NO_DISPLAY;surface=EGL_NO_SURFACE;context=EGL_NO_CONTEXT;}
+    void shutdown(){if(inWorld)saveWorld();shutdownAudio();running=false;if(lanSocket>=0){close(lanSocket);lanSocket=-1;}lanMode=0;remoteValid=false;for(auto&entry:chunks)if(entry.second.meshVbo){glDeleteBuffers(1,&entry.second.meshVbo);entry.second.meshVbo=0;entry.second.meshVertexCount=0;}chunks.clear();dirtyChunkQueue.clear();if(display!=EGL_NO_DISPLAY){eglMakeCurrent(display,EGL_NO_SURFACE,EGL_NO_SURFACE,EGL_NO_CONTEXT);if(context!=EGL_NO_CONTEXT)eglDestroyContext(display,context);if(surface!=EGL_NO_SURFACE)eglDestroySurface(display,surface);eglTerminate(display);}display=EGL_NO_DISPLAY;surface=EGL_NO_SURFACE;context=EGL_NO_CONTEXT;}
     void tick(float dt){frame(dt);}
     void save(){saveWorld();}
     bool isRunning() const { return running; }
