@@ -235,7 +235,7 @@
     }
     void frame(float dt){
         fpsAccumulator+=dt;fpsFrames++;if(fpsAccumulator>=0.5f){fpsValue=fpsFrames/fpsAccumulator;fpsFrames=0;fpsAccumulator=0;}
-        if(!running||!eglMakeCurrent(display,surface,surface,context))return;dt=std::min(dt,.04f);
+        if(!running||!eglMakeCurrent(display,surface,surface,context))return;dt=std::min(dt,.04f);swordCooldown=std::max(0.0f,swordCooldown-dt);
         if(!inWorld){glViewport(0,0,width,height);glClearColor(.10f,.18f,.25f,1);glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);if(settingsOpen)drawSettings();else drawMenu();eglSwapBuffers(display,surface);return;}
         if(playerDead){swallowTimer+=dt;if(swallowTimer>2.8f){playerDead=false;swallowTimer=0;health=10;armor=10;px=0;pz=0;feet=(float)groundHeight(0,0);vy=0;grounded=true;grafikX=6;grafikZ=-5;grafikFeet=(float)groundHeight(6,-5);grafikAlive=true;grafikHealth=6;grafikHitTimer=0;khalilHealth=8;khalilAlive=true;khalilHitTimer=0;deathMessage="GRAFIK ATE YOU";} }
         dayClock=std::fmod(dayClock+dt,1200.0f);animationTime+=dt;updateSky();
