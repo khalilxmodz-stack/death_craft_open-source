@@ -1,3 +1,6 @@
+// Subsystem: OpenGL ES shader setup, geometry helpers, and texture loading.
+// Function comments describe each method's responsibility and its place in the game systems.
+
     GLuint makeShader(GLenum type,const char*src){GLuint s=glCreateShader(type);glShaderSource(s,1,&src,nullptr);glCompileShader(s);GLint ok=0;glGetShaderiv(s,GL_COMPILE_STATUS,&ok);if(!ok){char log[1024];glGetShaderInfoLog(s,1024,nullptr,log);LOGE("Shader: %s",log);}return s;}
     bool setupGL(){
         const char*vs=R"(#version 300 es
