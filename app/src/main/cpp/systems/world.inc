@@ -63,6 +63,34 @@
         if(it==chunks.end())return y<0;
         uint8_t b=it->second.get(modp(x,CS),y,modp(z,CS));return b!=0&&b!=9;
     }
+    float mobSurfaceHeight(float x,float z,float referenceFeet){
+        int bx=(int)std::floor(x),bz=(int)std::floor(z);
+        int top=std::min(HEIGHT-2,(int)std::floor(referenceFeet)+1);
+        int bottom=std::max(0,(int)std::floor(referenceFeet)-2);
+        for(int y=top;y>=bottom;y--)
+            if(solid(bx,y,bz)&&!solid(bx,y+1,bz)&&!solid(bx,y+2,bz))return (float)(y+1);
+        return -1000.0f;
+    }
+    bool mobCanStandAt(float x,float feetY,float z,float radius,float bodyHeight){
+        int minY=(int)std::floor(feetY+.04f),maxY=(int)std::floor(feetY+bodyHeight-.04f);
+        const float offsets[3]={-radius,0.0f,radius};
+        for(int yi=minY;yi<=maxY;yi++)
+            for(float ox:offsets)for(float oz:offsets)
+                if(solid((int)std::floor(x+ox),(int)yi,(int)std::floor(z+oz)))return false;
+        return true;
+    }
+    bool mobTryStep(float x,float z,float oldFeet,float radius,float bodyHeight,float& newFeet){
+        float surface=mobSurfaceHeight(x,z,oldFeet);
+        if(surface<0.0f||std::abs(surface-oldFeet)>1.05f)return false;
+        if(!mobCanStandAt(x,surface,z,radius,bodyHeight))return false;
+        newFeet=surface;return true;
+    }
+    void moveMobOnBlocks(float& x,float& z,float& feetY,float nx,float nz,float radius,float bodyHeight){
+        float nextFeet=feetY;
+        if(mobTryStep(nx,nz,feetY,radius,bodyHeight,nextFeet)){x=nx;z=nz;feetY=nextFeet;return;}
+        if(mobTryStep(nx,z,feetY,radius,bodyHeight,nextFeet)){x=nx;feetY=nextFeet;}
+        if(mobTryStep(x,nz,feetY,radius,bodyHeight,nextFeet)){z=nz;feetY=nextFeet;}
+    }
     void markChunkDirty(int cx,int cz){
         auto it=chunks.find(chunkKey(cx,cz));
         if(it==chunks.end())return;
