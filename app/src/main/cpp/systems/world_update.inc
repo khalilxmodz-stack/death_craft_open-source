@@ -180,7 +180,7 @@
             float pdx=px-explosionX,pdy=feet+0.85f-explosionY,pdz=pz-explosionZ;
             float blastDistance=std::sqrt(pdx*pdx+pdy*pdy+pdz*pdz);
             if(blastDistance<4.5f&&!creativeMode){
-                int damage=blastDistance<2.0f?10:(blastDistance<3.3f?6:3);
+                int damage=blastDistance<2.0f?20:(blastDistance<3.3f?12:6);
                 health=std::max(0,health-damage);status="KHALIL EXPLOSION!";statusFrames=120;
                 if(health<=0){playerDead=true;swallowTimer=.001f;deathMessage="KHALIL EXPLODED";}
             }else{status="KHALIL EXPLODED";statusFrames=100;}
