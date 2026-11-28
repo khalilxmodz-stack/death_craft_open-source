@@ -1,0 +1,55 @@
+name: Format C++ Sources
+
+on:
+  push:
+    branches: [ "main" ]
+    paths:
+      - "app/src/main/cpp/**/*.cpp"
+      - "app/src/main/cpp/**/*.h"
+      - "app/src/main/cpp/**/*.hpp"
+      - "app/src/main/cpp/**/*.inc"
+      - ".clang-format"
+      - ".github/workflows/format-cpp.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: format-cpp-main
+  cancel-in-progress: true
+
+jobs:
+  format:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install clang-format
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang-format
+
+      - name: Format project C++ sources
+        shell: bash
+        run: |
+          find app/src/main/cpp -type f \\
+            \\( -name '*.cpp' -o -name '*.h' -o -name '*.hpp' -o -name '*.inc' \\) \\
+            ! -name 'stb_image.h' -print0 | xargs -0 -r clang-format -i
+
+      - name: Commit formatted sources
+        run: |
+          if git diff --quiet; then
+            echo "All C++ sources already follow the formatting rules."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/src/main/cpp
+          git commit -m "style: format C++ source files"
+          git push origin HEAD:main
