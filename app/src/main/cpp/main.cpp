@@ -95,6 +95,8 @@ class Game {
     std::vector<DroppedItem> droppedItems;
     std::vector<BlockParticle> blockParticles;
     std::vector<PrimedTnt> primedTnts;
+    std::map<std::tuple<int,int,int>,uint8_t> waterFlowDepth;
+    float waterSimulationTimer=0.0f;
     float khalilX=9.0f,khalilFeet=1.0f,khalilZ=0.0f,khalilFuse=0.0f,khalilRespawn=0.0f,khalilHitTimer=0.0f;
     int khalilHealth=8;
     bool khalilAlive=true,khalilPrimed=false;
