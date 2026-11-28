@@ -1,3 +1,6 @@
+// Subsystem: Main-menu and settings-screen rendering.
+// Function comments describe each method's responsibility and its place in the game systems.
+
     void drawSettings(){
         glDisable(GL_DEPTH_TEST);std::vector<float>v;
         addFace(v,{-.78f,-.72f,0},{.78f,-.72f,0},{.78f,.72f,0},{-.78f,.72f,0},{.025f,.035f,.05f});
