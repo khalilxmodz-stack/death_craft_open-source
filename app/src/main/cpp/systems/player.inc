@@ -50,11 +50,14 @@
             if(selectedBlock()==11||selectedBlock()==12||selectedBlock()==15||selectedBlock()==16||selectedBlock()==17){status="TOOLS AND ITEMS CANNOT BE PLACED";statusFrames=70;return;}
             if(!inventory[selected].count){status="Select a block";statusFrames=90;return;}uint8_t item=selectedBlock();if(ay<0||ay>=HEIGHT)return;
             if(overlaps(ax+.5f,ay,az+.5f)){status="Cannot place inside player";statusFrames=90;return;}
-            int cx=floorDiv(ax,CS),cz=floorDiv(az,CS);Chunk&c=ensureChunk(cx,cz);c.set(modp(ax,CS),ay,modp(az,CS),item);edits[{ax,ay,az}]=item;markBlockDirty(ax,ay,az);consumeSelected();
+            if(item==20&&(ay+1>=HEIGHT||blockAt(ax,ay+1,az)!=0||overlaps(ax+.5f,ay+1,az+.5f))){status="NEED TWO CLEAR BLOCKS";statusFrames=75;return;}
+            int cx=floorDiv(ax,CS),cz=floorDiv(az,CS);Chunk&c=ensureChunk(cx,cz);c.set(modp(ax,CS),ay,modp(az,CS),item);edits[{ax,ay,az}]=item;
+            if(item==20){c.set(modp(ax,CS),ay+1,modp(az,CS),22);edits[{ax,ay+1,az}]=22;}
+            markBlockDirty(ax,ay,az);consumeSelected();
             if(lanMode){LanPacket packet{};packet.type=3;packet.player=networkId;packet.bx=ax;packet.by=ay;packet.bz=az;packet.block=item;sendLan(packet);}
         }else{
             uint8_t broken=0;auto it=chunks.find(chunkKey(floorDiv(x,CS),floorDiv(z,CS)));if(it!=chunks.end())broken=it->second.get(modp(x,CS),y,modp(z,CS));if(broken==19){breaking=false;breakTimer=0;return;}
-            if(broken==20||broken==21){int doorY=y+1;Chunk&dc=ensureChunk(floorDiv(x,CS),floorDiv(z,CS));dc.set(modp(x,CS),doorY,modp(z,CS),0);edits[{x,doorY,z}]=0;markBlockDirty(x,doorY,z);}
+            if(broken==20||broken==21||broken==22||broken==23){int baseY=(broken==22||broken==23)?y-1:y;Chunk&dc=ensureChunk(floorDiv(x,CS),floorDiv(z,CS));for(int dy=0;dy<2;dy++){dc.set(modp(x,CS),baseY+dy,modp(z,CS),0);edits[{x,baseY+dy,z}]=0;}markBlockDirty(x,baseY,z);}
             int cx=floorDiv(x,CS),cz=floorDiv(z,CS);Chunk&c=ensureChunk(cx,cz);c.set(modp(x,CS),y,modp(z,CS),0);edits[{x,y,z}]=0;waterFlowDepth.erase({x,y,z});markBlockDirty(x,y,z);
             uint8_t dropId=broken==4?4:(broken==5?5:(broken==13?17:(broken==3?3:((broken==1||broken==2)?2:(broken==6?6:broken)))));
             if(dropId)spawnBlockEffects(x,y,z,dropId);
@@ -63,8 +66,14 @@
     }
     void useTarget(){
         int x,y,z,ax,ay,az;
-        if(raycast(x,y,z,ax,ay,az)&&(blockAt(x,y,z)==20||blockAt(x,y,z)==21)){
-            uint8_t next=blockAt(x,y,z)==20?21:20;Chunk& doorChunk=ensureChunk(floorDiv(x,CS),floorDiv(z,CS));doorChunk.set(modp(x,CS),y,modp(z,CS),next);edits[{x,y,z}]=next;markBlockDirty(x,y,z);if(lanMode){LanPacket packet{};packet.type=3;packet.player=networkId;packet.bx=x;packet.by=y;packet.bz=z;packet.block=next;sendLan(packet);}return;
+        if(raycast(x,y,z,ax,ay,az)&&(blockAt(x,y,z)==20||blockAt(x,y,z)==21||blockAt(x,y,z)==22||blockAt(x,y,z)==23)){
+            int baseY=(blockAt(x,y,z)==22||blockAt(x,y,z)==23)?y-1:y;
+            uint8_t lower=blockAt(x,baseY,z),upper=blockAt(x,baseY+1,z);
+            uint8_t nextLower=lower==20?21:20,nextUpper=upper==22?23:22;
+            Chunk& doorChunk=ensureChunk(floorDiv(x,CS),floorDiv(z,CS));
+            doorChunk.set(modp(x,CS),baseY,modp(z,CS),nextLower);doorChunk.set(modp(x,CS),baseY+1,modp(z,CS),nextUpper);
+            edits[{x,baseY,z}]=nextLower;edits[{x,baseY+1,z}]=nextUpper;markBlockDirty(x,baseY,z);
+            if(lanMode){for(int dy=0;dy<2;dy++){LanPacket packet{};packet.type=3;packet.player=networkId;packet.bx=x;packet.by=baseY+dy;packet.bz=z;packet.block=dy?nextUpper:nextLower;sendLan(packet);}}return;
         }
         if(raycast(x,y,z,ax,ay,az)&&blockAt(x,y,z)==18){if(!isNight()){status="YOU CAN ONLY SLEEP AT NIGHT";statusFrames=100;return;}if(lanMode==2){status="ONLY HOST CAN SLEEP";statusFrames=100;return;}dayClock=300.0f;nightActive=false;grafikAlive=false;khalilAlive=false;skeletonAlive=false;skeletonArrows.clear();khalilPrimed=false;khalilFuse=0;updateSky();saveWorld();status="GOOD MORNING";statusFrames=120;return;}
         if(inventory[selected].count>0&&inventory[selected].id==11){attackMonster();return;}if(inventory[selected].count>0&&(inventory[selected].id==12||inventory[selected].id==15||inventory[selected].id==16)){status="TOOL EQUIPPED";statusFrames=45;return;}
