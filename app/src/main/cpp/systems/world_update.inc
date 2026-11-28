@@ -475,7 +475,7 @@
         const float* m=vp.m;
         for(int i=0;i<6;i++){
             int sign=(i&1)?-1:1,axis=i/2;
-            frustum[i]={m[3]+sign*m[axis*4],m[7]+sign*m[axis*4+1],m[11]+sign*m[axis*4+2],m[15]+sign*m[axis*4+3]};
+            frustum[i]={m[3]+sign*m[axis],m[7]+sign*m[4+axis],m[11]+sign*m[8+axis],m[15]+sign*m[12+axis]};
             float len=std::sqrt(frustum[i][0]*frustum[i][0]+frustum[i][1]*frustum[i][1]+frustum[i][2]*frustum[i][2]);
             if(len>0)for(float&v:frustum[i])v/=len;
         }
