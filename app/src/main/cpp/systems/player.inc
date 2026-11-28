@@ -108,12 +108,11 @@
     void updateGrafik(float dt){
         grafikHitTimer=std::max(0.0f,grafikHitTimer-dt);
         if(lanMode==2)return;
-        if(!grafikAlive){grafikRespawn+=dt;if(grafikRespawn>18.0f){grafikAlive=true;grafikHealth=6;grafikHitTimer=0;grafikX=px+6.0f;grafikZ=pz-5.0f;grafikFeet=(float)groundHeight((int)std::floor(grafikX),(int)std::floor(grafikZ));}return;}
+        if(!grafikAlive){grafikRespawn+=dt;if(grafikRespawn>18.0f){grafikAlive=true;grafikHealth=6;grafikHitTimer=0;grafikX=px+6.0f;grafikZ=pz-5.0f;grafikFeet=mobSurfaceHeight(grafikX,grafikZ,feet);if(grafikFeet<0.0f)grafikFeet=(float)groundHeight((int)std::floor(grafikX),(int)std::floor(grafikZ));}return;}
         if(playerDead||creativeMode)return;
         float dx=px-grafikX,dz=pz-grafikZ,dist=std::sqrt(dx*dx+dz*dz);
-        if(dist<.82f){playerDead=true;swallowTimer=.001f;return;}
+        if(dist<.82f){playerDead=true;swallowTimer=.001f;deathMessage="GRAFIK ATE YOU";return;}
         if(dist>1.0f){float step=std::min(2.35f*dt,dist-.72f);float nx=grafikX+dx/dist*step,nz=grafikZ+dz/dist*step;
-            int gh=groundHeight((int)std::floor(nx),(int)std::floor(nz));
-            if(std::abs((float)gh-grafikFeet)<=1.1f){grafikX=nx;grafikZ=nz;grafikFeet=(float)gh;}
+            moveMobOnBlocks(grafikX,grafikZ,grafikFeet,nx,nz,.38f,1.30f);
         }
     }
