@@ -28,7 +28,7 @@
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR,"DeathCraft",__VA_ARGS__)
 static constexpr int CS=16, HEIGHT=64;
 static constexpr float PI=3.14159265f;
-static constexpr int SEA_LEVEL=30;
+static constexpr int SEA_LEVEL=46;
 
 struct V3 { float x,y,z; };
 struct Mat4 { float m[16]{}; };
