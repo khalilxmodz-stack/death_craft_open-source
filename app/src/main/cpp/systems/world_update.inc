@@ -336,7 +336,8 @@
             if(khalilRespawn>24.0f){
                 float angle=(float)(terrainHash((int)px+(int)animationTime,(int)pz)&0xffff)/65535.0f*2.0f*PI;
                 khalilX=px+std::cos(angle)*10.0f;khalilZ=pz+std::sin(angle)*10.0f;
-                khalilFeet=(float)groundHeight((int)std::floor(khalilX),(int)std::floor(khalilZ));
+                khalilFeet=mobSurfaceHeight(khalilX,khalilZ,khalilFeet);
+                if(khalilFeet<0.0f)khalilFeet=(float)groundHeight((int)std::floor(khalilX),(int)std::floor(khalilZ));
                 khalilAlive=true;khalilHealth=8;khalilHitTimer=0;khalilPrimed=false;khalilFuse=0;khalilRespawn=0;
             }
             return;
@@ -346,14 +347,14 @@
         if(dist>36.0f){
             float angle=(float)(terrainHash((int)px+17,(int)pz-29)&0xffff)/65535.0f*2.0f*PI;
             khalilX=px-std::cos(angle)*10.0f;khalilZ=pz-std::sin(angle)*10.0f;
-            khalilFeet=(float)groundHeight((int)std::floor(khalilX),(int)std::floor(khalilZ));
+            khalilFeet=mobSurfaceHeight(khalilX,khalilZ,khalilFeet);
+            if(khalilFeet<0.0f)khalilFeet=(float)groundHeight((int)std::floor(khalilX),(int)std::floor(khalilZ));
             dx=px-khalilX;dz=pz-khalilZ;dist=std::sqrt(dx*dx+dz*dz);
         }
         if(dist>2.15f){
             float step=std::min(3.15f*dt,dist-1.35f);
             float nx=khalilX+dx/dist*step,nz=khalilZ+dz/dist*step;
-            int gh=groundHeight((int)std::floor(nx),(int)std::floor(nz));
-            if(std::abs((float)gh-khalilFeet)<=1.1f){khalilX=nx;khalilZ=nz;khalilFeet=(float)gh;}
+            moveMobOnBlocks(khalilX,khalilZ,khalilFeet,nx,nz,.40f,1.50f);
         }
         if(dist<2.65f){khalilPrimed=true;khalilFuse+=dt;}
         if(khalilPrimed&&khalilFuse>=1.0f){
@@ -410,11 +411,27 @@
     }
     void updateSkeleton(float dt){
         skeletonHitTimer=std::max(0.0f,skeletonHitTimer-dt);
-        if(!skeletonAlive){skeletonRespawn+=dt;if(skeletonRespawn>22.0f){skeletonAlive=true;skeletonHealth=8;skeletonX=px+8.0f;skeletonZ=pz+5.0f;skeletonFeet=(float)groundHeight((int)skeletonX,(int)skeletonZ);skeletonShootTimer=1.2f;}return;}
-        float dx=px-skeletonX,dz=pz-skeletonZ,dist=std::sqrt(dx*dx+dz*dz);if(dist<.001f)return;skeletonYaw=std::atan2(dx,-dz);int gh=groundHeight((int)std::floor(skeletonX),(int)std::floor(skeletonZ));skeletonFeet=(float)gh;
-        if(!creativeMode&&!playerDead&&lanMode!=2){if(dist>8.0f){float step=std::min(1.15f*dt,dist-7.0f);float nx=skeletonX+dx/dist*step,nz=skeletonZ+dz/dist*step;int nh=groundHeight((int)std::floor(nx),(int)std::floor(nz));if(std::abs(nh-skeletonFeet)<=1){skeletonX=nx;skeletonZ=nz;skeletonFeet=(float)nh;}}else if(dist<5.0f){float step=std::min(.85f*dt,5.4f-dist);float nx=skeletonX-dx/dist*step,nz=skeletonZ-dz/dist*step;int nh=groundHeight((int)std::floor(nx),(int)std::floor(nz));if(std::abs(nh-skeletonFeet)<=1){skeletonX=nx;skeletonZ=nz;skeletonFeet=(float)nh;}}
+        if(!skeletonAlive){skeletonRespawn+=dt;if(skeletonRespawn>22.0f){skeletonAlive=true;skeletonHealth=8;skeletonX=px+8.0f;skeletonZ=pz+5.0f;skeletonFeet=mobSurfaceHeight(skeletonX,skeletonZ,feet);if(skeletonFeet<0.0f)skeletonFeet=(float)groundHeight((int)skeletonX,(int)skeletonZ);skeletonShootTimer=1.2f;}return;}
+        float dx=px-skeletonX,dz=pz-skeletonZ,dist=std::sqrt(dx*dx+dz*dz);if(dist<.001f)return;skeletonYaw=std::atan2(dx,-dz);
+        float currentSurface=mobSurfaceHeight(skeletonX,skeletonZ,skeletonFeet);
+        if(currentSurface>=0.0f)skeletonFeet=currentSurface;
+        if(!creativeMode&&!playerDead&&lanMode!=2){if(dist>8.0f){float step=std::min(1.15f*dt,dist-7.0f);float nx=skeletonX+dx/dist*step,nz=skeletonZ+dz/dist*step;moveMobOnBlocks(skeletonX,skeletonZ,skeletonFeet,nx,nz,.25f,1.78f);}else if(dist<5.0f){float step=std::min(.85f*dt,5.4f-dist);float nx=skeletonX-dx/dist*step,nz=skeletonZ-dz/dist*step;moveMobOnBlocks(skeletonX,skeletonZ,skeletonFeet,nx,nz,.25f,1.78f);}
             skeletonShootTimer-=dt;if(dist>=3.5f&&dist<=13.0f&&skeletonShootTimer<=0){ArrowProjectile a{};a.x=skeletonX+std::sin(skeletonYaw)*.38f;a.y=skeletonFeet+1.34f;a.z=skeletonZ-std::cos(skeletonYaw)*.38f;float vx=px-a.x,vy=(feet+1.05f)-a.y,vz=pz-a.z;float d=std::sqrt(vx*vx+vy*vy+vz*vz);if(d>.01f){float speed=9.0f;a.vx=vx/d*speed;a.vy=vy/d*speed+.9f;a.vz=vz/d*speed;a.life=2.3f;skeletonArrows.push_back(a);if(lanMode==1){LanPacket arrow{};arrow.type=12;arrow.player=networkId;arrow.x=a.x;arrow.y=a.y;arrow.z=a.z;arrow.yaw=a.vx;arrow.flags=(uint8_t)(int8_t)std::clamp((int)std::lround(a.vy*10.0f),-127,127);arrow.block=(uint8_t)(int8_t)std::clamp((int)std::lround(a.vz*10.0f),-127,127);sendLan(arrow);}}skeletonShootTimer=2.15f+(terrainHash((int)px,(int)pz)%70)/100.0f;}}
-        for(auto it=skeletonArrows.begin();it!=skeletonArrows.end();){it->life-=dt;it->vy-=5.8f*dt;it->x+=it->vx*dt;it->y+=it->vy*dt;it->z+=it->vz*dt;float ax=it->x-px,ay=it->y-(feet+1.0f),az=it->z-pz;if(!creativeMode&&!playerDead&&ax*ax+ay*ay+az*az<.55f){int damage=2;int absorbed=std::min(armor,damage);armor-=absorbed;damage-=absorbed;health=std::max(0,health-damage);status="SKELETON ARROW HIT";statusFrames=70;if(health<=0){playerDead=true;swallowTimer=.001f;deathMessage="SHOT BY SKELETON";}it=skeletonArrows.erase(it);continue;}if(it->life<=0||it->y<0){it=skeletonArrows.erase(it);continue;}++it;}
+        for(auto it=skeletonArrows.begin();it!=skeletonArrows.end();){
+            it->life-=dt;it->vy-=5.8f*dt;
+            float ox=it->x,oy=it->y,oz=it->z,nx=ox+it->vx*dt,ny=oy+it->vy*dt,nz=oz+it->vz*dt;
+            float travel=std::sqrt((nx-ox)*(nx-ox)+(ny-oy)*(ny-oy)+(nz-oz)*(nz-oz));
+            int samples=std::max(1,(int)std::ceil(travel/.10f));bool blocked=false,hitPlayer=false;
+            for(int sample=1;sample<=samples;sample++){
+                float t=(float)sample/samples,ax=ox+(nx-ox)*t,ay=oy+(ny-oy)*t,az=oz+(nz-oz)*t;
+                if(solid((int)std::floor(ax),(int)std::floor(ay),(int)std::floor(az))){blocked=true;break;}
+                float dxp=ax-px,dyp=ay-(feet+1.0f),dzp=az-pz;
+                if(!creativeMode&&!playerDead&&dxp*dxp+dyp*dyp+dzp*dzp<.55f){hitPlayer=true;break;}
+            }
+            if(hitPlayer){int damage=2;int absorbed=std::min(armor,damage);armor-=absorbed;damage-=absorbed;health=std::max(0,health-damage);status="SKELETON ARROW HIT";statusFrames=70;if(health<=0){playerDead=true;swallowTimer=.001f;deathMessage="SHOT BY SKELETON";}it=skeletonArrows.erase(it);continue;}
+            if(blocked||it->life<=0||ny<0){it=skeletonArrows.erase(it);continue;}
+            it->x=nx;it->y=ny;it->z=nz;++it;
+        }
     }
     void drawSkeleton(const Mat4&vp){
         if(!skeletonAlive&&skeletonArrows.empty())return;std::vector<float> mesh;
@@ -448,7 +465,7 @@
                         int damage=std::max(1,(int)std::floor(fallDistance-3.0f));
                         int absorbed=std::min(armor,damage);armor-=absorbed;damage-=absorbed;
                         health=std::max(0,health-damage);
-                        if(health<=0){playerDead=true;swallowTimer=.001f;}
+                        if(health<=0){playerDead=true;swallowTimer=.001f;deathMessage="FELL TO DEATH";}
                         else {status="FALL DAMAGE";statusFrames=90;}
                     }
                     fallTracking=false;fallPeakFeet=next;
