@@ -26,9 +26,9 @@
 #include "stb_image.h"
 
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR,"DeathCraft",__VA_ARGS__)
-static constexpr int CS=16, HEIGHT=32;
+static constexpr int CS=16, HEIGHT=64;
 static constexpr float PI=3.14159265f;
-static constexpr int SEA_LEVEL=6;
+static constexpr int SEA_LEVEL=30;
 
 struct V3 { float x,y,z; };
 struct Mat4 { float m[16]{}; };
@@ -71,7 +71,7 @@ static int terrainHeight(int x,int z){
     float high=std::pow(std::max(0.0f,(mountain-.56f)/.44f),1.25f)*19.0f+
                  std::pow(std::max(0.0f,(peaks-.65f)/.35f),1.7f)*7.0f+
                  std::pow(std::max(0.0f,(ridgeNoise-.82f)/.18f),2.0f)*2.8f;
-    return std::clamp((int)std::lround(3.0f+small+high),1,HEIGHT-7);
+    return std::clamp((int)std::lround(40.0f+small+high),34,HEIGHT-7);
 }
 static uint64_t chunkKey(int x,int z){return (uint64_t)(uint32_t)x<<32|(uint32_t)z;}
 

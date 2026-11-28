@@ -17,3 +17,7 @@ the artwork is ready.
 
 Recommended: use power-of-two dimensions (for example 256x256 or 512x512)
 for block and sky textures. Button images should have transparent backgrounds.
+
+
+Future audio assets belong in this folder:
+- sound/ (sound effects and music will be added later)

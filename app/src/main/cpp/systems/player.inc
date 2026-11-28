@@ -53,13 +53,12 @@
             int cx=floorDiv(ax,CS),cz=floorDiv(az,CS);Chunk&c=ensureChunk(cx,cz);c.set(modp(ax,CS),ay,modp(az,CS),item);edits[{ax,ay,az}]=item;markBlockDirty(ax,ay,az);consumeSelected();
             if(lanMode){LanPacket packet{};packet.type=3;packet.player=networkId;packet.bx=ax;packet.by=ay;packet.bz=az;packet.block=item;sendLan(packet);}
         }else{
-            uint8_t broken=0;auto it=chunks.find(chunkKey(floorDiv(x,CS),floorDiv(z,CS)));if(it!=chunks.end())broken=it->second.get(modp(x,CS),y,modp(z,CS));
+            uint8_t broken=0;auto it=chunks.find(chunkKey(floorDiv(x,CS),floorDiv(z,CS)));if(it!=chunks.end())broken=it->second.get(modp(x,CS),y,modp(z,CS));if(broken==19){breaking=false;breakTimer=0;return;}
             int cx=floorDiv(x,CS),cz=floorDiv(z,CS);Chunk&c=ensureChunk(cx,cz);c.set(modp(x,CS),y,modp(z,CS),0);edits[{x,y,z}]=0;waterFlowDepth.erase({x,y,z});markBlockDirty(x,y,z);
             uint8_t dropId=broken==4?4:(broken==5?5:(broken==13?17:(broken==3?3:((broken==1||broken==2)?2:(broken==6?6:broken)))));
             if(dropId)spawnBlockEffects(x,y,z,dropId);
             if(lanMode){LanPacket packet{};packet.type=3;packet.player=networkId;packet.bx=x;packet.by=y;packet.bz=z;packet.block=0;sendLan(packet);}
         }
-        status=place?"Block placed":"Block broken";statusFrames=60;
     }
     void useTarget(){
         int x,y,z,ax,ay,az;

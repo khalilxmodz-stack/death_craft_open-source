@@ -58,3 +58,7 @@ The GitHub Actions workflow `.github/workflows/android-apk.yml` builds the debug
 - Tree foliage texture is loaded as atlas layer 4 (zero-based index 3).
 - Keep new code in the matching `systems/` file where possible.
 - Test gameplay, lighting, and multiplayer on a physical Android device; CI confirms compilation and APK packaging, not device runtime behavior.
+
+- World height expanded to 64 blocks. The surface has one grass layer, 10 dirt layers, deep stone layers, and an unbreakable bedrock floor.
+- Block break/place confirmation popups have been removed to keep the HUD clean.
+- Future audio assets are reserved in `app/src/main/assets/textures/sound/`.

@@ -7,7 +7,7 @@
         if(!inWorld||saveDirectory.empty())return;
         std::ofstream out(savePath(),std::ios::binary|std::ios::trunc);if(!out)return;
         const char magic[8]={'D','C','W','O','R','L','D','1'};out.write(magic,8);
-        int32_t version=1,mode=creativeMode?1:0,flat=flatWorld,slot=selectedSlot,hp=health,ap=armor,sel=selected;uint32_t count=(uint32_t)edits.size();
+        int32_t version=2,mode=creativeMode?1:0,flat=flatWorld,slot=selectedSlot,hp=health,ap=armor,sel=selected;uint32_t count=(uint32_t)edits.size();
         out.write((char*)&version,4);out.write((char*)&mode,4);out.write((char*)&flat,4);out.write((char*)&slot,4);
         out.write((char*)&px,sizeof(px));out.write((char*)&feet,sizeof(feet));out.write((char*)&pz,sizeof(pz));out.write((char*)&yaw,sizeof(yaw));out.write((char*)&pitch,sizeof(pitch));
         out.write((char*)&hp,4);out.write((char*)&ap,4);out.write((char*)&sel,4);
@@ -20,13 +20,13 @@
         char magic[8]{};in.read(magic,8);if(!in||std::memcmp(magic,"DCWORLD1",8)!=0)return false;
         int32_t version=0,mode=1,flat=0,slot=0,hp=10,ap=10,sel=0;uint32_t count=0;
         in.read((char*)&version,4);in.read((char*)&mode,4);in.read((char*)&flat,4);in.read((char*)&slot,4);
-        if(!in||version!=1)return false;
+        if(!in||(version!=1&&version!=2))return false;
         in.read((char*)&px,sizeof(px));in.read((char*)&feet,sizeof(feet));in.read((char*)&pz,sizeof(pz));in.read((char*)&yaw,sizeof(yaw));in.read((char*)&pitch,sizeof(pitch));
         in.read((char*)&hp,4);in.read((char*)&ap,4);in.read((char*)&sel,4);
         for(auto&i:inventory){int32_t n=0;in.read((char*)&i.id,1);in.read((char*)&n,4);i.count=std::clamp(n,0,999999);}
         in.read((char*)&count,4);if(!in||count>2000000)return false;
         edits.clear();for(uint32_t i=0;i<count;i++){int32_t x,y,z;uint8_t b;in.read((char*)&x,4);in.read((char*)&y,4);in.read((char*)&z,4);in.read((char*)&b,1);if(!in)return false;edits[{x,y,z}]=b;}
-        creativeMode=mode!=0;spectatorMode=false;flatWorld=flat!=0;health=std::clamp(hp,0,10);armor=std::clamp(ap,0,10);selected=std::clamp(sel,0,4);return true;
+        if(version==1)feet=(float)groundHeight((int)std::floor(px),(int)std::floor(pz));creativeMode=mode!=0;spectatorMode=false;flatWorld=flat!=0;health=std::clamp(hp,0,10);armor=std::clamp(ap,0,10);selected=std::clamp(sel,0,4);return true;
     }
     void cycleGameMode(){if(!creativeMode&&!spectatorMode){creativeMode=true;spectatorMode=false;status="CREATIVE MODE";}else if(creativeMode){creativeMode=false;spectatorMode=true;status="SPECTATOR MODE";}else{creativeMode=false;spectatorMode=false;status="SURVIVAL MODE";}if(creativeMode)for(auto&i:inventory)if(i.id)i.count=999999;statusFrames=90;}
     void startWorld(){
@@ -120,7 +120,7 @@
                     float chamber=terrainNoise((wx-y*.48f)*.105f-73.0f,(wz+y*.62f)*.105f+47.0f);
                     cave=tunnel>.69f&&chamber>.48f;
                 }
-                if(!cave){uint8_t block=y==h-1?1:(y>=h-4?2:3);if(block==3&&y>2&&y<h-5&&terrainHash(wx*17+y*31,wz*13-y*7)%173u==0u)block=13;c.set(x,y,z,block);}
+                if(y==0){c.set(x,y,z,19);continue;}if(!cave){uint8_t block=y==h-1?1:(y>=h-11?2:3);if(block==3&&y>2&&y<h-12&&terrainHash(wx*17+y*31,wz*13-y*7)%173u==0u)block=13;c.set(x,y,z,block);}
             }
             if(h<SEA_LEVEL)for(int y=h;y<SEA_LEVEL;y++)c.set(x,y,z,9);
         }
@@ -138,7 +138,7 @@
         for(int z=oz-5;z<oz+CS+5;z++)for(int x=ox-5;x<ox+CS+5;x++){
             if(modp(x+3,8)||modp(z+5,8))continue;
             uint32_t h=terrainHash(x,z);if(h%4==0)continue;
-            int ground=groundHeight(x,z);if(ground<SEA_LEVEL||ground>12)continue;
+            int ground=groundHeight(x,z);if(ground<SEA_LEVEL||ground>48)continue;
             int type=(h>>5)%4;
             int trunk=type==1?5+(int)((h>>9)%2):(type==3?4:3+(int)((h>>9)%2));
             for(int y=0;y<trunk;y++)put(x,ground+y,z,4);
@@ -186,7 +186,7 @@
         return it->second;
     }
     V3 blockColor(uint8_t b,int face){
-        if(b==9)return{.12f,.42f,.82f};if(b==1){if(face==2)return{.22f,.68f,.18f};return{.42f,.29f,.16f};}
+        if(b==19)return{.12f,.12f,.14f};if(b==9)return{.12f,.42f,.82f};if(b==1){if(face==2)return{.22f,.68f,.18f};return{.42f,.29f,.16f};}
         if(b==2)return{.48f,.31f,.17f};if(b==3)return{.43f,.45f,.48f};
         if(b==4)return{.43f,.27f,.12f};if(b==5)return{.12f,.48f,.13f};if(b==6)return{.67f,.46f,.24f};if(b==13)return{.72f,.68f,.62f};if(b==14)return{.78f,.80f,.83f};if(b==8)return{.70f,.48f,.25f};if(b==10||b==11)return{1,1,1};if(b==18)return{.92f,.20f,.24f};return{.72f,.62f,.35f};
     }
