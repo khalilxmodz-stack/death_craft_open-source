@@ -59,7 +59,7 @@
                 for(int dy=2;dy<=5;dy++)if(blockAt(gx+dx,gy+dy,gz+dz)==5){underTree=true;break;}
             if(underTree)light*=.52f;
         }
-        V3 color=block==9?V3{.22f*light,.52f*light,.88f*light}:V3{light,light,light};
+        V3 color=block==10?V3{1,1,1}:(block==9?V3{.22f*light,.52f*light,.88f*light}:V3{light,light,light});
         addTri(v,a,b,c,color,u0,v0,u1,v0,u1,v1);addTri(v,a,c,d,color,u0,v0,u1,v1,u0,v1);
     }
     bool solid(int x,int y,int z){
