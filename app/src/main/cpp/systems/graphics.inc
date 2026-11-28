@@ -79,7 +79,7 @@
                         unsigned char bb=band?(y<96?218:225):(stripe?23:32);
                         if(y%32<3||x%32<2){rr=(unsigned char)(rr*0.78f);gg=(unsigned char)(gg*0.78f);bb=(unsigned char)(bb*0.78f);}
                         if(band){
-                            int col=x/16-4,row=(y-96)/10;
+                            int col=x/16-4,row=(165-y)/10;
                             if(col>=0&&col<17&&row>=0&&row<7){
                                 int letter=col<5?0:(col<11?1:2);
                                 int bit=col<5?col:(col<11?col-6:col-12);
@@ -89,6 +89,7 @@
                         size_t dst=((size_t)y*atlasW+(size_t)layer*tile+x)*4;
                         atlas[dst]=rr;atlas[dst+1]=gg;atlas[dst+2]=bb;atlas[dst+3]=255;
                     }
+                    loaded++;
                 }
                 continue;
             }
