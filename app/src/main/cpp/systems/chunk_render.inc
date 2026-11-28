@@ -746,6 +746,7 @@
         drawText("X", .66f, .62f, .025f, {1, 1, 1});
         glEnable(GL_DEPTH_TEST);
     }
+    // Maps a character to the seven-row bitmap used by the HUD font.
     std::array<uint8_t, 7> glyph(char c) {
         switch (c) {
             case 'A':
