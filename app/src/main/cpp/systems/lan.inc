@@ -38,7 +38,7 @@
             else if(p.type==7&&lanMode==2){if(p.flags&1){grafikHealth=p.block;grafikAlive=grafikHealth>0;grafikHitTimer=.28f;}else{khalilHealth=p.block;khalilAlive=khalilHealth>0;khalilHitTimer=.28f;}}
             else if(p.type==10&&lanMode==2){grafikX=p.x;grafikFeet=p.y;grafikZ=p.z;grafikAlive=(p.flags&1)!=0;grafikHitTimer=(p.flags&2)?.24f:0;grafikHealth=p.block;}
             else if(p.type==11&&lanMode==2){skeletonX=p.x;skeletonFeet=p.y;skeletonZ=p.z;skeletonYaw=p.yaw;skeletonAlive=(p.flags&1)!=0;skeletonHealth=p.block;}
-            else if(p.type==12&&lanMode==2){ArrowProjectile a{};a.x=p.x;a.y=p.y;a.z=p.z;a.vx=p.yaw;a.vy=p.flags/10.0f;a.vz=p.block/10.0f;a.life=2.4f;skeletonArrows.push_back(a);}
+            else if(p.type==12&&lanMode==2){ArrowProjectile a{};a.x=p.x;a.y=p.y;a.z=p.z;a.vx=p.yaw;a.vy=(int8_t)p.flags/10.0f;a.vz=(int8_t)p.block/10.0f;a.life=2.4f;skeletonArrows.push_back(a);}
             else if(p.type==8){DroppedItem item{};item.id=p.block;item.count=std::max(1,(int)p.flags);item.x=p.x;item.y=p.y;item.z=p.z;droppedItems.push_back(item);}
             else if(p.type==9){for(auto it=droppedItems.begin();it!=droppedItems.end();){float dx=it->x-p.x,dy=it->y-p.y,dz=it->z-p.z;if(dx*dx+dy*dy+dz*dz<.36f&&it->id==p.block){it=droppedItems.erase(it);break;}++it;}}
             else if(p.type==5&&lanMode==2){

@@ -243,6 +243,18 @@
         q({-.05f,.34f,.07f},{-.32f,.28f,.07f},{-.38f,.51f,.07f},{-.05f,.58f,.07f},{.43f,.25f,.10f});
         glDisable(GL_DEPTH_TEST);draw(mesh,GL_TRIANGLES,vp,px,feet+1.62f,pz,false,false);glEnable(GL_DEPTH_TEST);
     }
+    void drawHeldItem(const Mat4&vp){
+        if(selected<0||selected>=(int)inventory.size()||inventory[selected].count<=0)return;
+        uint8_t id=inventory[selected].id;if(id==11||id==12||id==15||id==16)return;
+        V3 right{std::cos(yaw),0,std::sin(yaw)},up{-std::sin(yaw)*std::sin(pitch),std::cos(pitch),std::cos(yaw)*std::sin(pitch)},forward{std::sin(yaw)*std::cos(pitch),std::sin(pitch),-std::cos(yaw)*std::cos(pitch)};
+        V3 origin{px+forward.x*.66f+right.x*.34f-up.x*.34f,feet+1.62f+forward.y*.66f+right.y*.34f-up.y*.34f,pz+forward.z*.66f+right.z*.34f-up.z*.34f};
+        auto pt=[&](float x,float y,float z){return V3{origin.x+right.x*x+up.x*y+forward.x*z,origin.y+right.y*x+up.y*y+forward.y*z,origin.z+right.z*x+up.z*y+forward.z*z};};
+        std::vector<float> mesh;auto face=[&](V3 a,V3 b,V3 c,V3 d,V3 col){addFace(mesh,pt(a.x,a.y,a.z),pt(b.x,b.y,b.z),pt(c.x,c.y,c.z),pt(d.x,d.y,d.z),col);};
+        float size=(id==7||id==17)?.10f:.19f;V3 col=blockColor(id,2);
+        V3 a{-size,-size,-size},b{size,-size,-size},c{size,size,-size},d{-size,size,-size},e{-size,-size,size},ff{size,-size,size},g{size,size,size},h{-size,size,size};
+        face(a,b,c,d,col);face(ff,e,h,g,{col.x*.7f,col.y*.7f,col.z*.7f});face(e,a,d,h,{col.x*.85f,col.y*.85f,col.z*.85f});face(b,ff,g,c,{col.x*.6f,col.y*.6f,col.z*.6f});face(d,c,g,h,{col.x*1.1f,col.y*1.1f,col.z*1.1f});face(e,ff,b,a,{col.x*.5f,col.y*.5f,col.z*.5f});
+        glDisable(GL_DEPTH_TEST);draw(mesh,GL_TRIANGLES,vp,px,feet+1.62f,pz,false,false);glEnable(GL_DEPTH_TEST);
+    }
     void updateWorldEffects(float dt){
         for(auto it=droppedItems.begin();it!=droppedItems.end();){
             it->age+=dt;it->vy-=12.0f*dt;it->x+=it->vx*dt;it->y+=it->vy*dt;it->z+=it->vz*dt;
@@ -385,8 +397,8 @@
         skeletonHitTimer=std::max(0.0f,skeletonHitTimer-dt);
         if(!skeletonAlive){skeletonRespawn+=dt;if(skeletonRespawn>22.0f){skeletonAlive=true;skeletonHealth=8;skeletonX=px+8.0f;skeletonZ=pz+5.0f;skeletonFeet=(float)groundHeight((int)skeletonX,(int)skeletonZ);skeletonShootTimer=1.2f;}return;}
         float dx=px-skeletonX,dz=pz-skeletonZ,dist=std::sqrt(dx*dx+dz*dz);if(dist<.001f)return;skeletonYaw=std::atan2(dx,-dz);int gh=groundHeight((int)std::floor(skeletonX),(int)std::floor(skeletonZ));skeletonFeet=(float)gh;
-        if(!creativeMode&&!playerDead){if(dist>8.0f){float step=std::min(1.15f*dt,dist-7.0f);float nx=skeletonX+dx/dist*step,nz=skeletonZ+dz/dist*step;int nh=groundHeight((int)std::floor(nx),(int)std::floor(nz));if(std::abs(nh-skeletonFeet)<=1){skeletonX=nx;skeletonZ=nz;skeletonFeet=(float)nh;}}else if(dist<5.0f){float step=std::min(.85f*dt,5.4f-dist);float nx=skeletonX-dx/dist*step,nz=skeletonZ-dz/dist*step;int nh=groundHeight((int)std::floor(nx),(int)std::floor(nz));if(std::abs(nh-skeletonFeet)<=1){skeletonX=nx;skeletonZ=nz;skeletonFeet=(float)nh;}}
-            skeletonShootTimer-=dt;if(dist>=3.5f&&dist<=13.0f&&skeletonShootTimer<=0){ArrowProjectile a{};a.x=skeletonX+std::sin(skeletonYaw)*.38f;a.y=skeletonFeet+1.34f;a.z=skeletonZ-std::cos(skeletonYaw)*.38f;float vx=px-a.x,vy=(feet+1.05f)-a.y,vz=pz-a.z;float d=std::sqrt(vx*vx+vy*vy+vz*vz);if(d>.01f){float speed=9.0f;a.vx=vx/d*speed;a.vy=vy/d*speed+.9f;a.vz=vz/d*speed;a.life=2.3f;skeletonArrows.push_back(a);}skeletonShootTimer=2.15f+(terrainHash((int)px,(int)pz)%70)/100.0f;}}
+        if(!creativeMode&&!playerDead&&lanMode!=2){if(dist>8.0f){float step=std::min(1.15f*dt,dist-7.0f);float nx=skeletonX+dx/dist*step,nz=skeletonZ+dz/dist*step;int nh=groundHeight((int)std::floor(nx),(int)std::floor(nz));if(std::abs(nh-skeletonFeet)<=1){skeletonX=nx;skeletonZ=nz;skeletonFeet=(float)nh;}}else if(dist<5.0f){float step=std::min(.85f*dt,5.4f-dist);float nx=skeletonX-dx/dist*step,nz=skeletonZ-dz/dist*step;int nh=groundHeight((int)std::floor(nx),(int)std::floor(nz));if(std::abs(nh-skeletonFeet)<=1){skeletonX=nx;skeletonZ=nz;skeletonFeet=(float)nh;}}
+            skeletonShootTimer-=dt;if(dist>=3.5f&&dist<=13.0f&&skeletonShootTimer<=0){ArrowProjectile a{};a.x=skeletonX+std::sin(skeletonYaw)*.38f;a.y=skeletonFeet+1.34f;a.z=skeletonZ-std::cos(skeletonYaw)*.38f;float vx=px-a.x,vy=(feet+1.05f)-a.y,vz=pz-a.z;float d=std::sqrt(vx*vx+vy*vy+vz*vz);if(d>.01f){float speed=9.0f;a.vx=vx/d*speed;a.vy=vy/d*speed+.9f;a.vz=vz/d*speed;a.life=2.3f;skeletonArrows.push_back(a);if(lanMode==1){LanPacket arrow{};arrow.type=12;arrow.player=networkId;arrow.x=a.x;arrow.y=a.y;arrow.z=a.z;arrow.yaw=a.vx;arrow.flags=(uint8_t)(int8_t)std::clamp((int)std::lround(a.vy*10.0f),-127,127);arrow.block=(uint8_t)(int8_t)std::clamp((int)std::lround(a.vz*10.0f),-127,127);sendLan(arrow);}}skeletonShootTimer=2.15f+(terrainHash((int)px,(int)pz)%70)/100.0f;}}
         for(auto it=skeletonArrows.begin();it!=skeletonArrows.end();){it->life-=dt;it->vy-=5.8f*dt;it->x+=it->vx*dt;it->y+=it->vy*dt;it->z+=it->vz*dt;float ax=it->x-px,ay=it->y-(feet+1.0f),az=it->z-pz;if(!creativeMode&&!playerDead&&ax*ax+ay*ay+az*az<.55f){int damage=2;int absorbed=std::min(armor,damage);armor-=absorbed;damage-=absorbed;health=std::max(0,health-damage);status="SKELETON ARROW HIT";statusFrames=70;if(health<=0){playerDead=true;swallowTimer=.001f;deathMessage="SHOT BY SKELETON";}it=skeletonArrows.erase(it);continue;}if(it->life<=0||it->y<0){it=skeletonArrows.erase(it);continue;}++it;}
     }
     void drawSkeleton(const Mat4&vp){
@@ -406,10 +418,10 @@
         dayClock=std::fmod(dayClock+dt,1200.0f);animationTime+=dt;updateSky();
         if(!playerDead){
         float forward=joyY,side=joyX,mag=std::sqrt(forward*forward+side*side);if(mag>1){forward/=mag;side/=mag;}
-        bool swimming=inWater();float speed=swimming?2.8f:5.2f;movePlayer((std::sin(yaw)*forward+std::cos(yaw)*side)*speed*dt,(-std::cos(yaw)*forward+std::sin(yaw)*side)*speed*dt);
-        if(swimming){grounded=false;fallTracking=false;vy-=2.0f*dt;if(feet+1.2f<SEA_LEVEL)vy+=5.0f*dt;vy*=.94f;vy=std::clamp(vy,-2.0f,3.0f);feet+=vy*dt;}
+        bool swimming=inWater();float speed=swimming?2.8f:5.2f;if(!spectatorMode)movePlayer((std::sin(yaw)*forward+std::cos(yaw)*side)*speed*dt,(-std::cos(yaw)*forward+std::sin(yaw)*side)*speed*dt);else{px+=(std::sin(yaw)*forward+std::cos(yaw)*side)*8.0f*dt;pz+=(-std::cos(yaw)*forward+std::sin(yaw)*side)*8.0f*dt;}
+        if(spectatorMode){vy=0;grounded=false;fallTracking=false;}else if(swimming){grounded=false;fallTracking=false;vy-=2.0f*dt;if(feet+1.2f<SEA_LEVEL)vy+=5.0f*dt;vy*=.94f;vy=std::clamp(vy,-2.0f,3.0f);feet+=vy*dt;}
         else {if(grounded&&!supported()){grounded=false;fallStartFeet=feet;fallPeakFeet=feet;fallTracking=true;}}
-        if(!grounded&&!swimming){fallPeakFeet=std::max(fallPeakFeet,feet);vy-=22*dt;float next=feet+vy*dt;if(vy<=0){int bx=(int)std::floor(px),bz=(int)std::floor(pz),by=(int)std::floor(next-.01f);
+        if(!spectatorMode&&!grounded&&!swimming){fallPeakFeet=std::max(fallPeakFeet,feet);vy-=22*dt;float next=feet+vy*dt;if(vy<=0){int bx=(int)std::floor(px),bz=(int)std::floor(pz),by=(int)std::floor(next-.01f);
             if(solid(bx,by,bz)||solid((int)std::floor(px-.25f),by,(int)std::floor(pz-.25f))||
                solid((int)std::floor(px+.25f),by,(int)std::floor(pz+.25f))||
                solid((int)std::floor(px-.25f),by,(int)std::floor(pz+.25f))||
@@ -430,7 +442,7 @@
             else if(vy>0){int by=(int)std::floor(next+1.8f);if(solid((int)std::floor(px),by,(int)std::floor(pz))){next=by-1.8f;vy=0;}}
             feet=next;if(feet< -20){feet=5;vy=0;fallTracking=false;}}
         // Keep the feet on the surface of the generated grass layer.
-        if(grounded&&feet<1.001f)feet=1.0f;
+        if(!spectatorMode&&grounded&&feet<1.001f)feet=1.0f;
         if(breaking){int tx,ty,tz,ax,ay,az;if(raycast(tx,ty,tz,ax,ay,az)){if(tx!=breakX||ty!=breakY||tz!=breakZ){breakX=tx;breakY=ty;breakZ=tz;breakTimer=0;}auto it=chunks.find(chunkKey(floorDiv(tx,CS),floorDiv(tz,CS)));uint8_t q=it==chunks.end()?0:it->second.get(modp(tx,CS),ty,modp(tz,CS));breakTimer+=dt;if(q&&breakTimer>=breakDuration(q)){editBlock(false);breaking=false;breakTimer=0;}}else breakTimer=0;}
         }
         updateGrafik(dt);
@@ -499,6 +511,7 @@
         drawHeldSword(vp);
         drawHeldPickaxe(vp);
         drawHeldWoodAxe(vp);
+        drawHeldItem(vp);
         drawSkeleton(vp);
         if(settingsOpen)drawSettings();else if(inventoryOpen)drawInventory();else drawHud();
         int gameMinutes=(int)(dayClock/1200.0f*1440.0f)%1440;
