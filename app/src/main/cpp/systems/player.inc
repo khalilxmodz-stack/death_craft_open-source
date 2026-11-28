@@ -62,6 +62,20 @@
         for(auto&entry:chunks)entry.second.dirty=true;
         status=place?"Block placed":"Block broken";statusFrames=60;
     }
+    void useTarget(){
+        int x,y,z,ax,ay,az;
+        if(raycast(x,y,z,ax,ay,az)&&blockAt(x,y,z)==10){
+            auto it=chunks.find(chunkKey(floorDiv(x,CS),floorDiv(z,CS)));
+            if(it!=chunks.end())it->second.set(modp(x,CS),y,modp(z,CS),0);
+            edits[{x,y,z}]=0;
+            primedTnts.push_back({x+.5f,y+.5f,z+.5f,2.0f});
+            for(auto&entry:chunks)entry.second.dirty=true;
+            status="TNT PRIMED - 2 SECONDS";statusFrames=100;
+            if(lanMode){LanPacket packet{};packet.type=3;packet.player=networkId;packet.bx=x;packet.by=y;packet.bz=z;packet.block=0;sendLan(packet);}
+            return;
+        }
+        attackGrafik();
+    }
     void attackGrafik(){
         if(!grafikAlive||playerDead)return;
         float dx=grafikX-px,dz=grafikZ-pz,dist=std::sqrt(dx*dx+dz*dz);
@@ -77,7 +91,7 @@
         if(playerDead||creativeMode)return;
         float dx=px-grafikX,dz=pz-grafikZ,dist=std::sqrt(dx*dx+dz*dz);
         if(dist<.82f){playerDead=true;swallowTimer=.001f;return;}
-        if(dist>1.0f){float step=std::min(1.65f*dt,dist-.72f);float nx=grafikX+dx/dist*step,nz=grafikZ+dz/dist*step;
+        if(dist>1.0f){float step=std::min(2.35f*dt,dist-.72f);float nx=grafikX+dx/dist*step,nz=grafikZ+dz/dist*step;
             int gh=groundHeight((int)std::floor(nx),(int)std::floor(nz));
             if(std::abs((float)gh-grafikFeet)<=1.1f){grafikX=nx;grafikZ=nz;grafikFeet=(float)gh;}
         }
