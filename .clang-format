@@ -16,3 +16,4 @@ DerivePointerAlignment: false
 PointerAlignment: Left
 SortIncludes: true
 SpaceAfterCStyleCast: false
+# Formatting is applied automatically by the Format C++ Sources workflow.
