@@ -2,7 +2,7 @@
     // Function comments describe each method's responsibility and its place in the game systems.
 
     // Adds items to existing stacks or empty inventory slots.
-    bool addItem(uint8_t id, int n) {
+    uint8_t id, int n) {
         if (!id || n <= 0)
             return true;
         for (auto& i : inventory)
@@ -26,16 +26,16 @@
         return true;
     }
     // Returns the block ID currently selected for placement.
-    uint8_t selectedBlock() const {
+    ) const {
         return inventory[selected].count ? inventory[selected].id : 1;
     }
     // Consumes one item from the selected slot in survival mode.
-    void consumeSelected() {
+    ) {
         if (!creativeMode && inventory[selected].count > 0 && --inventory[selected].count == 0)
             inventory[selected].id = 0;
     }
     // Counts all inventory items matching the requested ID.
-    int itemCount(uint8_t id) const {
+    uint8_t id) const {
         int n = 0;
         for (const auto& i : inventory)
             if (i.id == id)
@@ -43,7 +43,7 @@
         return n;
     }
     // Consumes a requested quantity unless creative mode is enabled.
-    bool consumeItem(uint8_t id, int amount) {
+    uint8_t id, int amount) {
         if (creativeMode)
             return true;
         if (itemCount(id) < amount)
@@ -59,7 +59,7 @@
         return amount == 0;
     }
     // Checks a recipe, consumes ingredients, and adds the crafted result.
-    void craft(int r) {
+    int r) {
         uint8_t src = 0, out = 0;
         int need = 0, give = 0;
         if (r == 0) {
@@ -135,7 +135,7 @@
         statusFrames = 75;
     }
     // Maps a screen coordinate to an inventory slot index.
-    int inventorySlotAt(float x, float y) const {
+    float x, float y) const {
         for (int r = 0; r < 4; r++)
             for (int c = 0; c < 5; c++) {
                 float bx = -.58f + c * .235f, by = .30f - r * .245f;
