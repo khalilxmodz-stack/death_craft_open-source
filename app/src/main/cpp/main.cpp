@@ -82,7 +82,7 @@ struct Chunk {
     void set(int x,int y,int z,uint8_t b){if(x>=0&&x<CS&&z>=0&&z<CS&&y>=0&&y<HEIGHT){blocks[(y*CS+z)*CS+x]=b;dirty=true;}}
 };
 
-struct LanPacket { uint32_t magic=0x44434654u; uint8_t type=0; uint32_t player=0; float x=0,y=0,z=0,yaw=0; int32_t bx=0,by=0,bz=0; uint8_t block=0; char name[24]{}; };
+struct LanPacket { uint32_t magic=0x44434654u; uint8_t type=0; uint32_t player=0; float x=0,y=0,z=0,yaw=0; int32_t bx=0,by=0,bz=0; uint8_t block=0; uint8_t flags=0; char name[24]{}; };
 
 class Game {
     EGLDisplay display=EGL_NO_DISPLAY; EGLSurface surface=EGL_NO_SURFACE; EGLContext context=EGL_NO_CONTEXT;

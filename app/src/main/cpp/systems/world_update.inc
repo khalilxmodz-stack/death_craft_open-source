@@ -120,6 +120,7 @@
 
     void updateKhalil(float dt){
         if(explosionEffectTimer>0)explosionEffectTimer=std::max(0.0f,explosionEffectTimer-dt);
+        if(lanMode==2)return;
         if(!khalilAlive){
             khalilRespawn+=dt;
             if(khalilRespawn>24.0f){
@@ -149,13 +150,12 @@
             explosionX=khalilX;explosionY=khalilFeet+.75f;explosionZ=khalilZ;explosionEffectTimer=.62f;
             float pdx=px-explosionX,pdy=feet+0.85f-explosionY,pdz=pz-explosionZ;
             float blastDistance=std::sqrt(pdx*pdx+pdy*pdy+pdz*pdz);
-            if(!creativeMode&&blastDistance<4.5f){
-                int damage=blastDistance<2.0f?8:(blastDistance<3.3f?5:3);
-                int absorbed=std::min(armor,damage);armor-=absorbed;damage-=absorbed;
-                health=std::max(0,health-damage);
-                status="KHALIL EXPLOSION!";statusFrames=120;
+            if(blastDistance<4.5f&&!creativeMode){
+                int damage=blastDistance<2.0f?10:(blastDistance<3.3f?6:3);
+                health=std::max(0,health-damage);status="KHALIL EXPLOSION!";statusFrames=120;
                 if(health<=0){playerDead=true;swallowTimer=.001f;deathMessage="KHALIL EXPLODED";}
             }else{status="KHALIL EXPLODED";statusFrames=100;}
+            if(lanMode==1){LanPacket event{};event.type=5;event.player=networkId;event.x=explosionX;event.y=explosionY;event.z=explosionZ;sendLan(event);}
             khalilAlive=false;khalilRespawn=0;khalilPrimed=false;khalilFuse=0;
         }
     }

@@ -6,7 +6,7 @@
         void main(){vec3 pos=p;if(waterAnimation>.5&&uvIn.x>.80){pos.y+=sin(animTime*1.15+p.x*.72+p.z*.61)*.035;}gl_Position=mvp*vec4(pos,1.0);color=c;texCoord=uvIn;fogDistance=length(pos-cameraPos);})";
         const char*fs=R"(#version 300 es
         precision highp float; in vec3 color; in float fogDistance; in vec2 texCoord; uniform float fogEnabled; uniform float textured; uniform sampler2D blockAtlas; uniform vec3 skyColor; out vec4 outColor;
-        void main(){vec3 base=color;if(textured>.5)base*=texture(blockAtlas,texCoord).rgb;float fog=fogEnabled*smoothstep(78.0,126.0,fogDistance);outColor=vec4(mix(base,skyColor,fog),1.0);})";
+        void main(){vec3 base=color;if(textured>.5)base*=texture(blockAtlas,texCoord).rgb;base=pow(max(base,vec3(0.0)),vec3(0.92));base=clamp((base-vec3(0.5))*1.10+vec3(0.5),0.0,1.0);float fog=fogEnabled*smoothstep(92.0,150.0,fogDistance);outColor=vec4(mix(base,skyColor,fog),1.0);})";
         GLuint a=makeShader(GL_VERTEX_SHADER,vs),b=makeShader(GL_FRAGMENT_SHADER,fs);
         program=glCreateProgram();glAttachShader(program,a);glAttachShader(program,b);glLinkProgram(program);glDeleteShader(a);glDeleteShader(b);
         GLint ok=0;glGetProgramiv(program,GL_LINK_STATUS,&ok);if(!ok)return false;
@@ -70,7 +70,7 @@
         }
         glGenTextures(1,&atlasTexture);glActiveTexture(GL_TEXTURE0);glBindTexture(GL_TEXTURE_2D,atlasTexture);
         glPixelStorei(GL_UNPACK_ALIGNMENT,1);glTexImage2D(GL_TEXTURE_2D,0,GL_RGBA,atlasW,tile,0,GL_RGBA,GL_UNSIGNED_BYTE,atlas.data());
-        glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_NEAREST_MIPMAP_LINEAR);glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_NEAREST);glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_NEAREST);
         glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_S,GL_CLAMP_TO_EDGE);glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_T,GL_CLAMP_TO_EDGE);glGenerateMipmap(GL_TEXTURE_2D);
         loadKhalilTexture(manager);
         LOGE("Loaded block textures: %d/5",loaded);return loaded>0;
