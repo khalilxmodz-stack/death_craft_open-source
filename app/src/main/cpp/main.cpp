@@ -89,7 +89,7 @@ class Game {
     GLuint program=0,vao=0,vbo=0,atlasTexture=0,khalilTexture=0; GLint mvpLoc=-1,cameraLoc=-1,fogLoc=-1,textureLoc=-1,atlasLoc=-1,skyColorLoc=-1,animTimeLoc=-1,waterAnimationLoc=-1,fogStartLoc=-1,fogEndLoc=-1;
     V3 skyTint{.48f,.74f,.96f};
     float dayClock=0.0f,animationTime=0.0f;
-    struct DroppedItem{uint8_t id=0;float x=0,y=0,z=0,vx=0,vy=0,vz=0,age=0;};
+    struct DroppedItem{uint8_t id=0;int count=1;float x=0,y=0,z=0,vx=0,vy=0,vz=0,age=0;};
     struct BlockParticle{float x=0,y=0,z=0,vx=0,vy=0,vz=0,life=0;uint8_t id=0;};
     struct PrimedTnt{float x=0,y=0,z=0,fuse=2.0f;};
     std::vector<DroppedItem> droppedItems;
