@@ -54,8 +54,8 @@
     void addBlockFace(std::vector<float>&v,V3 a,V3 b,V3 c,V3 d,uint8_t block,int face,int gx,int gy,int gz,float blockLight=-1.0f){
         int tile=block==11?6:(block==10?5:(block==9?4:(block==3?2:(block==5?3:(block==4?7:(block==13?8:(block==14?9:(block==8?10:((block==1&&face==2)?0:1)))))))));
         float u0=(tile+.012f)/12.0f,u1=(tile+.988f)/12.0f,v0=.012f,v1=.988f;
-        const float shade[6]={.72f,.84f,1.0f,.38f,.62f,.78f};
-        float light=shade[face]*(blockLight>=0.0f?blockLight:1.0f);V3 color=(block==10||block==13||block==14||block==8)?V3{light,light,light}:(block==9?V3{.22f*light,.52f*light,.88f*light}:V3{light,light,light});
+        const float shade[6]={.78f,.86f,1.0f,.62f,.70f,.78f};
+        float light=shade[face]*(blockLight>=0.0f?blockLight:1.0f);V3 color=block==18?V3{light,.20f*light,.24f*light}:((block==10||block==13||block==14||block==8)?V3{light,light,light}:(block==9?V3{.22f*light,.52f*light,.88f*light}:V3{light,light,light}));
         addTri(v,a,b,c,color,u0,v0,u1,v0,u1,v1);addTri(v,a,c,d,color,u0,v0,u1,v1,u0,v1);
     }
     bool solid(int x,int y,int z){
@@ -188,6 +188,6 @@
     V3 blockColor(uint8_t b,int face){
         if(b==9)return{.12f,.42f,.82f};if(b==1){if(face==2)return{.22f,.68f,.18f};return{.42f,.29f,.16f};}
         if(b==2)return{.48f,.31f,.17f};if(b==3)return{.43f,.45f,.48f};
-        if(b==4)return{.43f,.27f,.12f};if(b==5)return{.12f,.48f,.13f};if(b==6)return{.67f,.46f,.24f};if(b==13)return{.72f,.68f,.62f};if(b==14)return{.78f,.80f,.83f};if(b==8)return{.70f,.48f,.25f};if(b==10||b==11)return{1,1,1};return{.72f,.62f,.35f};
+        if(b==4)return{.43f,.27f,.12f};if(b==5)return{.12f,.48f,.13f};if(b==6)return{.67f,.46f,.24f};if(b==13)return{.72f,.68f,.62f};if(b==14)return{.78f,.80f,.83f};if(b==8)return{.70f,.48f,.25f};if(b==10||b==11)return{1,1,1};if(b==18)return{.92f,.20f,.24f};return{.72f,.62f,.35f};
     }
     float breakDuration(uint8_t b)const{uint8_t tool=selected>=0&&selected<(int)inventory.size()&&inventory[selected].count>0?inventory[selected].id:0;bool ironPick=tool==12,woodPick=tool==16,axe=tool==15;if((ironPick||woodPick)&&b==3)return ironPick?.24f:.95f;if(ironPick&&b==13)return .38f;if(axe&&b==4)return .28f;if((ironPick||woodPick)&&b==2)return ironPick?.30f:.70f;switch(b){case 1:return .65f;case 2:return .90f;case 3:return 2.10f;case 4:return 1.25f;case 5:return .30f;case 6:return 1.10f;case 8:return .90f;case 10:return .25f;case 11:return .25f;case 13:return 2.8f;case 14:return 3.0f;default:return .85f;}}

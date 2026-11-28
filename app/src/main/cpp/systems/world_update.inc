@@ -23,10 +23,11 @@
             if(it!=chunks.end()&&it->second.dirty)rebuild(it->second);
         }
     }
+    bool isNight()const{return std::sin(dayClock/1200.0f*2.0f*PI)<-.08f;}
     void updateSky(){
         float phase=dayClock/1200.0f;
         float daylight=std::clamp(std::sin(phase*2.0f*PI)*2.4f+.15f,0.0f,1.0f);
-        V3 night{.0015f,.002f,.006f},day{.48f,.74f,.96f},dawn{.92f,.34f,.16f};worldBrightness=.20f+.80f*daylight;
+        V3 night{.0015f,.002f,.006f},day{.48f,.74f,.96f},dawn{.92f,.34f,.16f};worldBrightness=.42f+.58f*daylight;
         skyTint={night.x+(day.x-night.x)*daylight,night.y+(day.y-night.y)*daylight,night.z+(day.z-night.z)*daylight};
         float sunHeight=std::sin(phase*2.0f*PI);
         float dusk=std::clamp(1.0f-std::abs(sunHeight)*3.2f,0.0f,1.0f)*(1.0f-daylight);
@@ -448,6 +449,13 @@
         if(!inWorld){glViewport(0,0,width,height);glClearColor(.10f,.18f,.25f,1);glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);if(settingsOpen)drawSettings();else drawMenu();eglSwapBuffers(display,surface);return;}
         if(playerDead){swallowTimer+=dt;if(swallowTimer>2.8f){playerDead=false;swallowTimer=0;health=10;armor=10;px=0;pz=0;feet=(float)groundHeight(0,0);vy=0;grounded=true;grafikX=6;grafikZ=-5;grafikFeet=(float)groundHeight(6,-5);skeletonX=px+8.0f;skeletonZ=pz+5.0f;skeletonFeet=(float)groundHeight((int)skeletonX,(int)skeletonZ);skeletonAlive=true;skeletonHealth=8;skeletonShootTimer=1.2f;skeletonArrows.clear();grafikAlive=true;grafikHealth=6;grafikHitTimer=0;khalilHealth=8;khalilAlive=true;khalilHitTimer=0;deathMessage="GRAFIK ATE YOU";} }
         dayClock=std::fmod(dayClock+dt,1200.0f);animationTime+=dt;updateSky();
+        bool nightNow=isNight();
+        if(nightNow&&!nightActive){
+            grafikX=px+6.0f;grafikZ=pz-5.0f;grafikFeet=(float)groundHeight((int)std::floor(grafikX),(int)std::floor(grafikZ));grafikAlive=true;grafikHealth=6;grafikHitTimer=0;grafikRespawn=0;
+            khalilX=px+9.0f;khalilZ=pz+4.0f;khalilFeet=(float)groundHeight((int)std::floor(khalilX),(int)std::floor(khalilZ));khalilAlive=true;khalilHealth=8;khalilHitTimer=0;khalilPrimed=false;khalilFuse=0;khalilRespawn=0;
+            skeletonX=px+8.0f;skeletonZ=pz+5.0f;skeletonFeet=(float)groundHeight((int)std::floor(skeletonX),(int)std::floor(skeletonZ));skeletonAlive=true;skeletonHealth=8;skeletonHitTimer=0;skeletonRespawn=0;skeletonShootTimer=1.4f;skeletonArrows.clear();
+        }else if(!nightNow&&nightActive){grafikAlive=false;khalilAlive=false;skeletonAlive=false;skeletonArrows.clear();khalilPrimed=false;khalilFuse=0;}
+        nightActive=nightNow;
         if(!playerDead){
         float forward=joyY,side=joyX,mag=std::sqrt(forward*forward+side*side);if(mag>1){forward/=mag;side/=mag;}
         bool swimming=inWater();float speed=swimming?2.8f:5.2f;if(!spectatorMode)movePlayer((std::sin(yaw)*forward+std::cos(yaw)*side)*speed*dt,(-std::cos(yaw)*forward+std::sin(yaw)*side)*speed*dt);else{px+=(std::sin(yaw)*forward+std::cos(yaw)*side)*8.0f*dt;pz+=(-std::cos(yaw)*forward+std::sin(yaw)*side)*8.0f*dt;}

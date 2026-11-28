@@ -13,7 +13,7 @@
             int occlusion=0;
             const int ox4[4]={-1,1,0,0},oz4[4]={0,0,-1,1};
             for(int n=0;n<4;n++)if(localSolid(x+ox4[n],y,z+oz4[n]))occlusion++;
-            float blockLight=std::max(.18f,ambient*(1.0f-occlusion*.10f));
+            float blockLight=std::max(.68f,ambient*(1.0f-occlusion*.045f));
             if(b==1){
                 bool underTree=false;
                 for(int dz=-2;dz<=2&&!underTree;dz++)for(int dx=-2;dx<=2&&!underTree;dx++)
@@ -22,17 +22,24 @@
                         uint8_t q=(tx>=0&&tx<CS&&tz>=0&&tz<CS)?c.get(tx,ty,tz):blockAt(ox+tx,ty,oz+tz);
                         if(q==5){underTree=true;break;}
                     }
-                if(underTree)blockLight*=.52f;
+                if(underTree)blockLight*=.88f;
             }
             float X=(float)(ox+x),Y=(float)y,Z=(float)(oz+z);
             V3 p000{X,Y,Z},p100{X+1,Y,Z},p110{X+1,Y+1,Z},p010{X,Y+1,Z};
             V3 p001{X,Y,Z+1},p101{X+1,Y,Z+1},p111{X+1,Y+1,Z+1},p011{X,Y+1,Z+1};
-            if(!localSolid(x,y,z-1)&&c.get(x,y,z-1)!=9)addBlockFace(c.mesh,p000,p100,p110,p010,b,0,ox+x,y,oz+z,blockLight);
-            if(!localSolid(x,y,z+1)&&c.get(x,y,z+1)!=9)addBlockFace(c.mesh,p101,p001,p011,p111,b,1,ox+x,y,oz+z,blockLight);
-            if(!localSolid(x,y+1,z)&&c.get(x,y+1,z)!=9)addBlockFace(c.mesh,p010,p110,p111,p011,b,2,ox+x,y,oz+z,blockLight);
-            if(!localSolid(x,y-1,z)&&c.get(x,y-1,z)!=9)addBlockFace(c.mesh,p001,p101,p100,p000,b,3,ox+x,y,oz+z,blockLight);
-            if(!localSolid(x-1,y,z)&&c.get(x-1,y,z)!=9)addBlockFace(c.mesh,p001,p000,p010,p011,b,4,ox+x,y,oz+z,blockLight);
-            if(!localSolid(x+1,y,z)&&c.get(x+1,y,z)!=9)addBlockFace(c.mesh,p100,p101,p111,p110,b,5,ox+x,y,oz+z,blockLight);
+            if(b==18){
+                auto box=[&](float x0,float y0,float z0,float x1,float y1,float z1,uint8_t material){V3 a{x0,y0,z0},bb{x1,y0,z0},cc{x1,y1,z0},dd{x0,y1,z0},e{x0,y0,z1},f{x1,y0,z1},g{x1,y1,z1},h{x0,y1,z1};addBlockFace(c.mesh,a,bb,cc,dd,material,0,ox+x,y,oz+z,blockLight);addBlockFace(c.mesh,f,e,h,g,material,1,ox+x,y,oz+z,blockLight);addBlockFace(c.mesh,dd,cc,g,h,material,2,ox+x,y,oz+z,blockLight);addBlockFace(c.mesh,e,f,bb,a,material,3,ox+x,y,oz+z,blockLight);addBlockFace(c.mesh,e,a,dd,h,material,4,ox+x,y,oz+z,blockLight);addBlockFace(c.mesh,bb,f,g,cc,material,5,ox+x,y,oz+z,blockLight);};
+                box(X+.05f,Y+.08f,Z+.05f,X+.95f,Y+.22f,Z+.95f,4);
+                box(X+.05f,Y+.22f,Z+.05f,X+.95f,Y+.48f,Z+.95f,18);
+                box(X+.08f,Y+.48f,Z+.72f,X+.92f,Y+.60f,Z+.94f,14);
+            }else{
+                if(!localSolid(x,y,z-1)&&c.get(x,y,z-1)!=9)addBlockFace(c.mesh,p000,p100,p110,p010,b,0,ox+x,y,oz+z,blockLight);
+                if(!localSolid(x,y,z+1)&&c.get(x,y,z+1)!=9)addBlockFace(c.mesh,p101,p001,p011,p111,b,1,ox+x,y,oz+z,blockLight);
+                if(!localSolid(x,y+1,z)&&c.get(x,y+1,z)!=9)addBlockFace(c.mesh,p010,p110,p111,p011,b,2,ox+x,y,oz+z,blockLight);
+                if(!localSolid(x,y-1,z)&&c.get(x,y-1,z)!=9)addBlockFace(c.mesh,p001,p101,p100,p000,b,3,ox+x,y,oz+z,blockLight);
+                if(!localSolid(x-1,y,z)&&c.get(x-1,y,z)!=9)addBlockFace(c.mesh,p001,p000,p010,p011,b,4,ox+x,y,oz+z,blockLight);
+                if(!localSolid(x+1,y,z)&&c.get(x+1,y,z)!=9)addBlockFace(c.mesh,p100,p101,p111,p110,b,5,ox+x,y,oz+z,blockLight);
+            }
         }
         c.meshVertexCount=(GLsizei)(c.mesh.size()/8);
         if(!c.mesh.empty()){
@@ -72,6 +79,7 @@
     void drawBlockIcon(uint8_t id,float x,float y,float w,float h){
         std::vector<float> icon;V3 white{1,1,1};
         if(id==15||id==16){float cx=x+w*.5f;addTri(icon,{cx-w*.06f,y+h*.05f,0},{cx+w*.06f,y+h*.05f,0},{cx+w*.045f,y+h*.67f,0},{.48f,.28f,.12f});addTri(icon,{cx-w*.06f,y+h*.05f,0},{cx+w*.045f,y+h*.67f,0},{cx-w*.045f,y+h*.67f,0},{.60f,.36f,.16f});if(id==15){addTri(icon,{cx-w*.02f,y+h*.68f,0},{x+w*.14f,y+h*.96f,0},{x+w*.48f,y+h*.78f,0},{.57f,.34f,.14f});addTri(icon,{cx-w*.02f,y+h*.68f,0},{x+w*.48f,y+h*.78f,0},{x+w*.84f,y+h*.96f,0},{.57f,.34f,.14f});}else{addTri(icon,{x+w*.12f,y+h*.68f,0},{x+w*.88f,y+h*.68f,0},{x+w*.78f,y+h*.84f,0},{.62f,.39f,.17f});addTri(icon,{x+w*.12f,y+h*.68f,0},{x+w*.78f,y+h*.84f,0},{x+w*.22f,y+h*.84f,0},{.72f,.48f,.22f});}draw(icon,GL_TRIANGLES,identity(),0,0,0,false,false,0,false);return;}
+        if(id==18){addTri(icon,{x+w*.08f,y+h*.22f,0},{x+w*.92f,y+h*.22f,0},{x+w*.92f,y+h*.62f,0},{.55f,.16f,.18f});addTri(icon,{x+w*.08f,y+h*.22f,0},{x+w*.92f,y+h*.62f,0},{x+w*.08f,y+h*.62f,0},{.88f,.22f,.25f});addTri(icon,{x+w*.12f,y+h*.62f,0},{x+w*.88f,y+h*.62f,0},{x+w*.78f,y+h*.90f,0},{.86f,.88f,.92f});addTri(icon,{x+w*.12f,y+h*.62f,0},{x+w*.78f,y+h*.90f,0},{x+w*.22f,y+h*.90f,0},{1,1,1});draw(icon,GL_TRIANGLES,identity(),0,0,0,false,false,0,false);return;}
         if(id==12){
             float cx=x+w*.5f,hy=y+h*.63f;
             addTri(icon,{cx-w*.055f,y+h*.04f,0},{cx+w*.055f,y+h*.04f,0},{cx+w*.04f,hy,0},{.42f,.23f,.09f});
@@ -149,8 +157,8 @@
         glDisable(GL_DEPTH_TEST);std::vector<float>v;auto r=[&](float x,float y,float w,float h,V3 c){addFace(v,{x,y,0},{x+w,y,0},{x+w,y+h,0},{x,y+h,0},c);};
         r(-.78f,-.73f,1.56f,1.43f,{.03f,.03f,.04f});r(-.75f,-.70f,1.50f,1.37f,{.13f,.14f,.16f});
         for(int i=0;i<20;i++){int row=i/5,col=i%5;float x=-.58f+col*.235f,y=.30f-row*.245f;r(x,y-.19f,.19f,.21f,i==selected?V3{.72f,.52f,.14f}:V3{.025f,.025f,.03f});r(x+.008f,y-.182f,.174f,.194f,{.24f,.24f,.26f});if(inventory[i].count&&i!=dragIndex){r(x+.055f,y-.135f,.075f,.09f,blockColor(inventory[i].id,2));drawText(inventory[i].count>=999999?"INF":std::to_string(inventory[i].count),x+.125f,y-.17f,.008f,{1,1,1});}}
-        r(.60f,.27f,.15f,.15f,{.02f,.02f,.025f});r(.60f,-.02f,.15f,.15f,{.02f,.02f,.025f});r(.60f,-.31f,.15f,.15f,{.02f,.02f,.025f});draw(v,GL_TRIANGLES,identity(),0,0,0,false);for(int i=0;i<20;i++)if(inventory[i].count&&i!=dragIndex){int row=i/5,col=i%5;float x=-.58f+col*.235f,y=.30f-row*.245f;drawBlockIcon(inventory[i].id,x+.055f,y-.135f,.075f,.09f);}if(dragIndex>=0&&inventory[dragIndex].count)drawBlockIcon(inventory[dragIndex].id,dragX-.035f,dragY-.035f,.075f,.09f);
-        drawText(craftingTableOpen?"CRAFTING TABLE":"INVENTORY",-.25f,.62f,.025f,{1,.85f,.35f});drawText("INVENTORY",-.22f,.47f,.012f,{.8f,.85f,.9f});drawText("RECIPES",.62f,.38f,.011f,{.8f,.85f,.9f});drawText("DRAG TO MOVE - OUTSIDE TO DROP",-.52f,-.66f,.012f,{1,1,1});drawText(craftingTableOpen?"WOOD AXE":"PLANKS",.57f,.48f,.015f,{1,1,1});drawText(craftingTableOpen?"WOOD PICK":"STICKS",.58f,.19f,.015f,{1,1,1});drawText(craftingTableOpen?"IRON BLOCK":"TABLE",.59f,-.10f,.015f,{1,1,1});drawText("X",.66f,.62f,.025f,{1,1,1});glEnable(GL_DEPTH_TEST);
+        r(.60f,.27f,.15f,.15f,{.02f,.02f,.025f});r(.60f,-.02f,.15f,.15f,{.02f,.02f,.025f});r(.60f,-.31f,.15f,.15f,{.02f,.02f,.025f});r(.60f,-.60f,.15f,.12f,{.02f,.02f,.025f});draw(v,GL_TRIANGLES,identity(),0,0,0,false);for(int i=0;i<20;i++)if(inventory[i].count&&i!=dragIndex){int row=i/5,col=i%5;float x=-.58f+col*.235f,y=.30f-row*.245f;drawBlockIcon(inventory[i].id,x+.055f,y-.135f,.075f,.09f);}if(dragIndex>=0&&inventory[dragIndex].count)drawBlockIcon(inventory[dragIndex].id,dragX-.035f,dragY-.035f,.075f,.09f);
+        drawText(craftingTableOpen?"CRAFTING TABLE":"INVENTORY",-.25f,.62f,.025f,{1,.85f,.35f});drawText("INVENTORY",-.22f,.47f,.012f,{.8f,.85f,.9f});drawText("RECIPES",.62f,.38f,.011f,{.8f,.85f,.9f});drawText("DRAG TO MOVE - OUTSIDE TO DROP",-.52f,-.66f,.012f,{1,1,1});drawText(craftingTableOpen?"WOOD AXE":"PLANKS",.57f,.48f,.015f,{1,1,1});drawText(craftingTableOpen?"WOOD PICK":"STICKS",.58f,.19f,.015f,{1,1,1});drawText(craftingTableOpen?"IRON BLOCK":"TABLE",.59f,-.10f,.015f,{1,1,1});drawText("BED",.63f,-.55f,.015f,{1,1,1});drawText("X",.66f,.62f,.025f,{1,1,1});glEnable(GL_DEPTH_TEST);
     }
     std::array<uint8_t,7> glyph(char c){
         switch(c){
