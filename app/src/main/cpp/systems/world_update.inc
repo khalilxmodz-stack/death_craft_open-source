@@ -1,8 +1,8 @@
     void updateWorld(){
         int cx=floorDiv((int)std::floor(px),CS),cz=floorDiv((int)std::floor(pz),CS);
-        for(int z=-LOAD_RADIUS;z<=LOAD_RADIUS;z++)for(int x=-LOAD_RADIUS;x<=LOAD_RADIUS;x++)ensureChunk(cx+x,cz+z);
+        for(int z=-drawDistance;z<=drawDistance;z++)for(int x=-drawDistance;x<=drawDistance;x++)ensureChunk(cx+x,cz+z);
         for(auto it=chunks.begin();it!=chunks.end();){
-            if(std::abs(it->second.cx-cx)>LOAD_RADIUS+1||std::abs(it->second.cz-cz)>LOAD_RADIUS+1)it=chunks.erase(it);else ++it;
+            if(std::abs(it->second.cx-cx)>drawDistance+1||std::abs(it->second.cz-cz)>drawDistance+1)it=chunks.erase(it);else ++it;
         }
         for(auto&entry:chunks)if(entry.second.dirty)rebuild(entry.second);
     }
@@ -229,7 +229,7 @@
     void frame(float dt){
         fpsAccumulator+=dt;fpsFrames++;if(fpsAccumulator>=0.5f){fpsValue=fpsFrames/fpsAccumulator;fpsFrames=0;fpsAccumulator=0;}
         if(!running||!eglMakeCurrent(display,surface,surface,context))return;dt=std::min(dt,.04f);
-        if(!inWorld){glViewport(0,0,width,height);glClearColor(.10f,.18f,.25f,1);glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);drawMenu();eglSwapBuffers(display,surface);return;}
+        if(!inWorld){glViewport(0,0,width,height);glClearColor(.10f,.18f,.25f,1);glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);if(settingsOpen)drawSettings();else drawMenu();eglSwapBuffers(display,surface);return;}
         if(playerDead){swallowTimer+=dt;if(swallowTimer>2.8f){playerDead=false;swallowTimer=0;health=10;armor=10;px=0;pz=0;feet=(float)groundHeight(0,0);vy=0;grounded=true;grafikX=6;grafikZ=-5;grafikFeet=(float)groundHeight(6,-5);grafikAlive=true;grafikHealth=2;deathMessage="GRAFIK ATE YOU";} }
         dayClock=std::fmod(dayClock+dt,1200.0f);animationTime+=dt;updateSky();
         if(!playerDead){
@@ -269,7 +269,7 @@
         if(inWorld){saveTimer+=dt;if(saveTimer>=12.0f){saveWorld();saveTimer=0;}}
         updateWorld();
         glViewport(0,0,width,height);glClearColor(skyTint.x,skyTint.y,skyTint.z,1);glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
-        Mat4 vp=mul(perspective(1.02f,(float)width/height,.1f,320),camera(px,feet+1.62f,pz,yaw,pitch));drawSkyDecor(vp);glClear(GL_DEPTH_BUFFER_BIT);
+        Mat4 vp=mul(perspective(1.02f,(float)width/height,.1f,std::max(120.0f,(float)drawDistance*CS*2.5f)),camera(px,feet+1.62f,pz,yaw,pitch));drawSkyDecor(vp);glClear(GL_DEPTH_BUFFER_BIT);
         for(auto&entry:chunks)draw(entry.second.mesh,GL_TRIANGLES,vp,px,feet+1.62f,pz,true,true);
         std::vector<float> clouds;
         auto cloudCube=[&](float x,float y,float z,float w,float h,float d){V3 a{x,y,z},b{x+w,y,z},c{x+w,y+h,z},dd{x,y+h,z},e{x,y,z+d},ff{x+w,y,z+d},g{x+w,y+h,z+d},hh{x,y+h,z+d};V3 col{.94f,.97f,1.0f};addFace(clouds,a,b,c,dd,col);addFace(clouds,ff,e,hh,g,col);addFace(clouds,e,a,dd,hh,col);addFace(clouds,b,ff,g,c,col);addFace(clouds,dd,c,g,hh,col);addFace(clouds,e,ff,b,a,col);};
@@ -322,7 +322,7 @@
             for(int i=0;i<24;i+=2){for(int j:{e[i],e[i+1]})edge.insert(edge.end(),{p[j].x,p[j].y,p[j].z,white.x,white.y,white.z,0,0});}
             glDisable(GL_CULL_FACE);draw(edge,GL_LINES,vp,px,feet+1.62f,pz,true);
         }
-        if(inventoryOpen)drawInventory();else drawHud();
+        if(settingsOpen)drawSettings();else if(inventoryOpen)drawInventory();else drawHud();
         int gameMinutes=(int)(dayClock/1200.0f*1440.0f)%1440;
         std::string clockText=(gameMinutes/60<10?"0":"")+std::to_string(gameMinutes/60)+":"+(gameMinutes%60<10?"0":"")+std::to_string(gameMinutes%60);
         drawText(clockText,-.045f,.91f,.010f,{1,1,1});
