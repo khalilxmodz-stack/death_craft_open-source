@@ -63,17 +63,21 @@ static float terrainNoise(float x,float z){
     return (a+(b-a)*fx)+((c+(d-c)*fx)-(a+(b-a)*fx))*fz;
 }
 static int terrainHeight(int x,int z){
-    float broad=terrainNoise(x*.018f+17,z*.018f-31);
-    float hills=terrainNoise(x*.075f-43,z*.075f+11);
-    float detail=terrainNoise(x*.16f+71,z*.16f-59);
-    float mountain=terrainNoise(x*.012f+107,z*.012f-83);
-    float peaks=terrainNoise(x*.038f-37,z*.038f+91);
-    float ridgeNoise=terrainNoise(x*.052f+129,z*.052f-147);
-    float small=(broad-.5f)*4.0f+(hills-.5f)*4.6f+(detail-.5f)*1.8f;
-    float high=std::pow(std::max(0.0f,(mountain-.56f)/.44f),1.25f)*19.0f+
-                 std::pow(std::max(0.0f,(peaks-.65f)/.35f),1.7f)*7.0f+
-                 std::pow(std::max(0.0f,(ridgeNoise-.82f)/.18f),2.0f)*2.8f;
-    return std::clamp((int)std::lround(46.0f+small+high),42,HEIGHT-7);
+    float broad=terrainNoise(x*.014f+17,z*.014f-31);
+    float hills=terrainNoise(x*.052f-43,z*.052f+11);
+    float detail=terrainNoise(x*.145f+71,z*.145f-59);
+    float mountain=terrainNoise(x*.010f+107,z*.010f-83);
+    float peaks=terrainNoise(x*.031f-37,z*.031f+91);
+    float ridgeNoise=terrainNoise(x*.061f+129,z*.061f-147);
+    float valley=terrainNoise(x*.022f-211,z*.022f+173);
+    float small=(broad-.5f)*5.2f+(hills-.5f)*5.8f+(detail-.5f)*1.45f;
+    float mask=std::clamp((mountain-.43f)*2.25f,0.0f,1.0f);
+    float ridge=1.0f-std::abs(peaks*2.0f-1.0f);
+    float high=mask*(std::pow(std::max(0.0f,(peaks-.40f)/.60f),1.35f)*18.0f+
+        std::pow(std::max(0.0f,(ridgeNoise-.68f)/.32f),1.7f)*8.0f+
+        std::pow(std::max(0.0f,(ridge-.72f)/.28f),2.0f)*5.0f);
+    float valleyCut=std::pow(std::max(0.0f,(valley-.68f)/.32f),1.4f)*5.0f;
+    return std::clamp((int)std::lround(45.0f+small+high-valleyCut),38,HEIGHT-7);
 }
 static uint64_t chunkKey(int x,int z){return (uint64_t)(uint32_t)x<<32|(uint32_t)z;}
 

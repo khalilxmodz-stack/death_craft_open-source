@@ -117,46 +117,44 @@
             for(int y=0;y<h;y++){
                 bool cave=false;
                 if(y>2&&y<h-3){
-                    float tunnel=terrainNoise((wx+y*1.65f)*.067f+31.0f,(wz-y*.92f)*.067f-19.0f);
-                    float chamber=terrainNoise((wx-y*.48f)*.105f-73.0f,(wz+y*.62f)*.105f+47.0f);
-                    cave=tunnel>.69f&&chamber>.48f;
+                    float tunnel=terrainNoise((wx+y*1.35f)*.061f+31.0f,(wz-y*.78f)*.061f-19.0f);
+                    float chamber=terrainNoise((wx-y*.42f)*.092f-73.0f,(wz+y*.55f)*.092f+47.0f);
+                    float branch=terrainNoise((wx+y*.31f)*.135f+117.0f,(wz-y*.27f)*.135f-91.0f);
+                    cave=(tunnel>.705f&&chamber>.46f)||(tunnel>.76f&&branch>.55f);
                 }
                 if(y==0){c.set(x,y,z,19);continue;}if(!cave){uint8_t block=y==h-1?1:(y>=h-11?2:3);if(block==3&&y>2&&y<h-12&&terrainHash(wx*17+y*31,wz*13-y*7)%173u==0u)block=13;c.set(x,y,z,block);}
             }
             if(h<SEA_LEVEL)for(int y=h;y<SEA_LEVEL;y++)c.set(x,y,z,9);
         }
         auto put=[&](int x,int y,int z,uint8_t id){if(floorDiv(x,CS)==c.cx&&floorDiv(z,CS)==c.cz&&y>=0&&y<HEIGHT)c.set(modp(x,CS),y,modp(z,CS),id);};
-        const int caveCell=52;
+        const int caveCell=58;
         for(int gz=floorDiv(oz-55,caveCell);gz<=floorDiv(oz+CS+55,caveCell);gz++)for(int gx=floorDiv(ox-55,caveCell);gx<=floorDiv(ox+CS+55,caveCell);gx++){
-            uint32_t seed=terrainHash(gx*71+193,gz*97-251);if(seed%5u!=0u)continue;
+            uint32_t seed=terrainHash(gx*71+193,gz*97-251);if(seed%6u!=0u)continue;
             int ex=gx*caveCell+8+(int)((seed>>8)%36u),ez=gz*caveCell+8+(int)((seed>>16)%36u),surface=groundHeight(ex,ez);if(surface<SEA_LEVEL+2||surface>HEIGHT-9)continue;
-            float angle=(float)((seed>>4)&1023u)/1024.0f*2.0f*PI,dx=std::cos(angle),dz=std::sin(angle);bool deep=(seed&0x100000u)!=0;int length=deep?27:10;
-            for(int t=0;t<=length;t++){float cx=ex+dx*t*.62f,cz=ez+dz*t*.62f,cy=surface-1.0f-t*(deep?.52f:.38f),radius=t<3?2.45f:(deep?2.0f:1.45f);
+            float angle=(float)((seed>>4)&1023u)/1024.0f*2.0f*PI,dx=std::cos(angle),dz=std::sin(angle);bool deep=(seed&0x100000u)!=0;int length=deep?30:8+(int)((seed>>21)%8u);
+            for(int t=0;t<=length;t++){float cx=ex+dx*t*.62f,cz=ez+dz*t*.62f,cy=surface-1.0f-t*(deep?.48f:.34f),radius=t<3?2.65f:(deep?2.15f:1.35f);
                 for(int vz=(int)cz-3;vz<=(int)cz+3;vz++)for(int vx=(int)cx-3;vx<=(int)cx+3;vx++)for(int vy=(int)cy-2;vy<=(int)cy+2;vy++){float nx=(vx+.5f-cx)/radius,nz=(vz+.5f-cz)/radius,ny=(vy+.5f-cy)/(radius*.78f);if(nx*nx+ny*ny+nz*nz<1.0f)put(vx,vy,vz,0);}}
             if(deep){float cx=ex+dx*length*.62f,cz=ez+dz*length*.62f,cy=surface-1.0f-length*.52f;for(int vz=(int)cz-5;vz<=(int)cz+5;vz++)for(int vx=(int)cx-5;vx<=(int)cx+5;vx++)for(int vy=(int)cy-4;vy<=(int)cy+4;vy++){float nx=(vx+.5f-cx)/4.2f,nz=(vz+.5f-cz)/4.2f,ny=(vy+.5f-cy)/3.3f;if(nx*nx+ny*ny+nz*nz<1.0f)put(vx,vy,vz,0);}}
         }
-        // Four deterministic silhouettes: oak, pine, broad crown and slim birch-like tree.
-        for(int z=oz-5;z<oz+CS+5;z++)for(int x=ox-5;x<ox+CS+5;x++){
+        // Six deterministic tree silhouettes with varied height and canopy profiles.
+        for(int z=oz-7;z<oz+CS+7;z++)for(int x=ox-7;x<ox+CS+7;x++){
             if(modp(x+3,8)||modp(z+5,8))continue;
-            uint32_t h=terrainHash(x,z);if(h%4==0)continue;
+            uint32_t h=terrainHash(x,z);if(h%5u==0u)continue;
             int ground=groundHeight(x,z);if(ground<SEA_LEVEL||ground>48)continue;
-            int type=(h>>5)%4;
-            int trunk=type==1?5+(int)((h>>9)%2):(type==3?4:3+(int)((h>>9)%2));
+            int type=(h>>5)%6;
+            int trunk=(type==1?6:(type==4?5:(type==5?4:3)))+(int)((h>>9)%2u);
             for(int y=0;y<trunk;y++)put(x,ground+y,z,4);
             int top=ground+trunk;
             if(type==1){
-                for(int layer=0;layer<4;layer++){
-                    int radius=3-layer,yy=top-2+layer;
+                for(int layer=0;layer<5;layer++){int radius=4-layer,yy=top-3+layer;
                     for(int dz=-radius;dz<=radius;dz++)for(int dx=-radius;dx<=radius;dx++)
-                        if(std::abs(dx)+std::abs(dz)<=radius+1)put(x+dx,yy,z+dz,5);
-                }
+                        if(std::abs(dx)+std::abs(dz)<=radius+1)put(x+dx,yy,z+dz,5);}
                 put(x,top+2,z,5);
-            }else if(type==2){
-                for(int dy=-1;dy<=2;dy++){
-                    int radius=(dy==2?1:(dy==-1?2:3));
+            }else if(type==2||type==4||type==5){
+                for(int dy=-2;dy<=2;dy++){int radius=dy==2?1:(dy==-2?2:(type==4?3:2));
                     for(int dz=-radius;dz<=radius;dz++)for(int dx=-radius;dx<=radius;dx++)
-                        if(dx*dx+dz*dz<=radius*radius+1)put(x+dx,top+dy,z+dz,5);
-                }
+                        if(dx*dx+dz*dz<=radius*radius+1)put(x+dx,top+dy,z+dz,5);}
+                if(type==4){for(int d=-2;d<=2;d+=4){put(x+d,top-1,z,5);put(x,top-1,z+d,5);}}
             }else if(type==3){
                 for(int dy=-1;dy<=1;dy++)for(int dx=-1;dx<=1;dx++)for(int dz=-1;dz<=1;dz++)
                     if(std::abs(dx)+std::abs(dz)<=1)put(x+dx,top+dy,z+dz,5);
@@ -169,6 +167,20 @@
                 }
                 put(x,top+1,z,5);
             }
+        }
+        // Sparse natural ground cover: four flower colours and small grass tufts.
+        for(int z=oz-1;z<oz+CS+1;z++)for(int x=ox-1;x<ox+CS+1;x++){
+            uint32_t h=terrainHash(x*13+701,z*17-419);
+            if(h%7u!=0u)continue;
+            int ground=groundHeight(x,z);
+            if(ground<SEA_LEVEL+1||ground>HEIGHT-9)continue;
+            int slope=std::max({std::abs(ground-groundHeight(x+1,z)),std::abs(ground-groundHeight(x-1,z)),
+                std::abs(ground-groundHeight(x,z+1)),std::abs(ground-groundHeight(x,z-1))});
+            if(slope>2||terrainHash(x+5,z-9)%5u==0u)continue;
+            if(floorDiv(x,CS)!=c.cx||floorDiv(z,CS)!=c.cz)continue;
+            if(c.get(modp(x,CS),ground,modp(z,CS))!=0)continue;
+            uint8_t plant=(h%11u==0u)?(uint8_t)(24u+((h>>8)%4u)):28u;
+            put(x,ground,z,plant);
         }
         for(const auto& e:edits){
             int x=std::get<0>(e.first), y=std::get<1>(e.first), z=std::get<2>(e.first);

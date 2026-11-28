@@ -1,12 +1,13 @@
     void rebuild(Chunk&c){
         c.mesh.clear();c.shadowMesh.clear();int ox=c.cx*CS,oz=c.cz*CS;
         auto localSolid=[&](int x,int y,int z){
-            if(x>=0&&x<CS&&z>=0&&z<CS){uint8_t q=c.get(x,y,z);return q!=0&&q!=9;}
+            if(x>=0&&x<CS&&z>=0&&z<CS){uint8_t q=c.get(x,y,z);return q!=0&&q!=9&&!(q>=24&&q<=28);}
             return solid(ox+x,y,oz+z);
         };
         // Calculate ambient light once per block, not once per visible face.
         for(int y=0;y<HEIGHT;y++)for(int z=0;z<CS;z++)for(int x=0;x<CS;x++){
             uint8_t b=c.get(x,y,z);if(!b)continue;
+            bool plantBlock=b>=24&&b<=28;
             bool skyVisible=true;
             for(int sy=y+1;sy<HEIGHT;sy++)if(localSolid(x,sy,z)){skyVisible=false;break;}
             float ambient=skyVisible?1.0f:.24f;
@@ -27,7 +28,28 @@
             float X=(float)(ox+x),Y=(float)y,Z=(float)(oz+z);
             V3 p000{X,Y,Z},p100{X+1,Y,Z},p110{X+1,Y+1,Z},p010{X,Y+1,Z};
             V3 p001{X,Y,Z+1},p101{X+1,Y,Z+1},p111{X+1,Y+1,Z+1},p011{X,Y+1,Z+1};
-            if(b==22||b==23){continue;}else if(b==20||b==21){
+            if(plantBlock){
+                auto blade=[&](float x0,float z0,float x1,float z1,float height,V3 color){
+                    V3 a{x0,Y,z0},bb{x1,Y,z1},cc{x1,Y+height,z1},d{x0,Y+height,z0};
+                    addTri(c.mesh,a,bb,cc,color);addTri(c.mesh,a,cc,d,color);
+                    V3 e{x1,Y,z0},f{x0,Y,z1},g{x0,Y+height,z1},hh{x1,Y+height,z0};
+                    addTri(c.mesh,e,f,g,color);addTri(c.mesh,e,g,hh,color);
+                };
+                if(b==28){
+                    blade(X+.12f,Z+.20f,X+.42f,Z+.34f,.62f,{.22f,.62f,.16f});
+                    blade(X+.52f,Z+.12f,X+.82f,Z+.38f,.48f,{.30f,.72f,.19f});
+                    blade(X+.18f,Z+.68f,X+.48f,Z+.84f,.54f,{.18f,.55f,.14f});
+                    blade(X+.58f,Z+.60f,X+.86f,Z+.78f,.68f,{.35f,.76f,.20f});
+                }else{
+                    V3 stem{.18f,.48f,.13f};
+                    blade(X+.46f,Z+.46f,X+.54f,Z+.54f,.46f,stem);
+                    V3 petal=b==24?V3{1.0f,.24f,.30f}:(b==25?V3{1.0f,.78f,.16f}:(b==26?V3{.78f,.42f,.94f}:V3{1.0f,.92f,.88f}));
+                    float cx=X+.5f,cz=Z+.5f,py=Y+.48f;
+                    addFace(c.mesh,{cx-.22f,py,cz},{cx+.22f,py,cz},{cx+.12f,py+.25f,cz},{cx-.12f,py+.25f,cz},petal);
+                    addFace(c.mesh,{cx,py,cz-.22f},{cx,py,cz+.22f},{cx,py+.25f,cz+.12f},{cx,py+.25f,cz-.12f},petal);
+                    addFace(c.mesh,{cx-.09f,py+.22f,cz-.09f},{cx+.09f,py+.22f,cz-.09f},{cx+.09f,py+.38f,cz+.09f},{cx-.09f,py+.38f,cz+.09f},{1.0f,.82f,.22f});
+                }
+            }else if(b==22||b==23){continue;}else if(b==20||b==21){
                 float x0=X+.06f,x1=X+.94f,z0=b==20?Z+.43f:Z+.06f,z1=b==20?Z+.57f:Z+.94f;
                 auto quad=[&](float ax,float ay,float az,float bx,float by,float bz,float cx,float cy,float cz,float dx,float dy,float dz,uint8_t mat){addBlockFace(c.mesh,{ax,ay,az},{bx,by,bz},{cx,cy,cz},{dx,dy,dz},mat,0,ox+x,y,oz+z,blockLight);};
                 // Light oak door slab with a darker inset frame and four small square peephole panels.
