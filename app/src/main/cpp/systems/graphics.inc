@@ -65,7 +65,33 @@
             int read=(int)AAsset_read(asset,encoded.data(),(size_t)length);AAsset_close(asset);
             if(read<=0)continue;
             int w=0,h=0,channels=0;unsigned char* pixels=stbi_load_from_memory(encoded.data(),read,&w,&h,&channels,4);
-            if(!pixels){LOGE("Texture decode failed: %s",names[layer]);continue;}
+            if(!pixels){
+                LOGE("Texture decode failed: %s",names[layer]);
+                if(layer==5){
+                    // tnt.png in the project is WebP data despite its .png extension;
+                    // stb_image cannot decode WebP, so build the same TNT tile directly.
+                    static const uint8_t letters[3][7]={{31,4,4,4,4,4,4},{17,27,21,21,17,17,17},{31,4,4,4,4,4,4}};
+                    for(int y=0;y<tile;y++)for(int x=0;x<tile;x++){
+                        bool band=y>=88&&y<168;
+                        int stripe=(x/32)%2;
+                        unsigned char rr=band?(y<96?218:245):(stripe?205:224);
+                        unsigned char gg=band?(y<96?218:239):(stripe?30:43);
+                        unsigned char bb=band?(y<96?218:225):(stripe?23:32);
+                        if(y%32<3||x%32<2){rr=(unsigned char)(rr*0.78f);gg=(unsigned char)(gg*0.78f);bb=(unsigned char)(bb*0.78f);}
+                        if(band){
+                            int col=x/16-4,row=(y-96)/10;
+                            if(col>=0&&col<17&&row>=0&&row<7){
+                                int letter=col<5?0:(col<11?1:2);
+                                int bit=col<5?col:(col<11?col-6:col-12);
+                                if(letters[letter][row]&(1<<(4-bit))){rr=24;gg=29;bb=49;}
+                            }
+                        }
+                        size_t dst=((size_t)y*atlasW+(size_t)layer*tile+x)*4;
+                        atlas[dst]=rr;atlas[dst+1]=gg;atlas[dst+2]=bb;atlas[dst+3]=255;
+                    }
+                }
+                continue;
+            }
             for(int y=0;y<tile;y++)for(int x=0;x<tile;x++){
                 int sx=x*w/tile,sy=y*h/tile;size_t src=((size_t)sy*w+sx)*4;
                 size_t dst=((size_t)y*atlasW+(size_t)layer*tile+x)*4;
